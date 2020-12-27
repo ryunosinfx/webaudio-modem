@@ -104,8 +104,17 @@ class Spectrogramer {
         this.ctx.clearRect(0, 0, this.WIDTH, this.HEIGHT);
         this.ctx.putImageData(imageData, 0, 0);
     }
+    stop() {
+        this.isStop = false;
+    }
     animate() {
+        this.isStop = false;
+        this.requestID = null;
         const draw = () => {
+            if (this.isStop) {
+                window.cancelAnimationFrame(this.requestID);
+                return;
+            }
             this.shiftUp();
             this.analyser.getByteFrequencyData(this.buffer);
             const dx = Math.floor(Math.ceil(this.WIDTH / this.buffer.byteLength));
@@ -114,7 +123,7 @@ class Spectrogramer {
                 this.ctx.fillStyle = `rgba(100, 255, 100, ${alpha})`;
                 this.ctx.fillRect(i * dx, HEIGHT - 1, dx, 1);
             });
-            let loop = requestAnimationFrame(draw);
+            this.requestID = requestAnimationFrame(draw);
         };
         draw();
     }

@@ -202,11 +202,20 @@ class EncodeVisualiser {
         }
         ctx.stroke();
     }
+    stop() {
+        this.isStop = true;
+    }
     animateCanvas() {
+        this.isStop = true;
+        this.requestID = null;
         const draw = () => {
+            if (this.isStop) {
+                window.cancelAnimationFrame(this.requestID);
+                return;
+            }
             this.drawSpectrum();
             this.drawWaveform();
-            let loop = requestAnimationFrame(draw);
+            this.requestID = requestAnimationFrame(draw);
         };
         draw();
     }
