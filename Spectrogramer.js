@@ -91,7 +91,7 @@ class Spectrogramer {
         V.init();
     }
     getOnResizeCanvasFunc() {
-        resizeCanvas = () => {
+        return () => {
             const parentNode = this.canvasElm.parentNode;
             V.sa(this.canvasElm, 'width', parentNode.offsetWidth);
             V.sa(this.canvasElm, 'height', parentNode.offsetHeight);

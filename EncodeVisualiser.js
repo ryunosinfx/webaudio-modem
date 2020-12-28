@@ -74,7 +74,7 @@ class EncodeVisualiser {
         this.init();
         V.init();
     }
-    async int() {
+    async init() {
         const masterGain = BaseSetting.audioContext.createGain();
         masterGain.gain.value = 1.0 / BaseSetting.frequencies.length;
         masterGain.connect(BaseSetting.audioContext.destination);

@@ -62,7 +62,7 @@ class Encoder {
         this.init();
         V.init();
     }
-    async int() {
+    async init() {
         const masterGain = BaseSetting.audioContext.createGain();
         masterGain.gain.value = 1.0 / BaseSetting.frequencies.length;
         const sinusoids = BaseSetting.frequencies.map((f) => {
@@ -117,8 +117,8 @@ class Encoder {
         const chars = text.split('');
         const textLen = chars.length;
         for (let i = 0; i < textLen; i++) {
-            await ProsessUtil.sleep(timeBetweenChars * 1);
-            await this.encodeChar(char, duration);
+            await ProsessUtil.sleep(timeBetweenChars * i);
+            await this.encodeChar(chars[i], duration);
         }
         await ProsessUtil.sleep(timeBetweenChars * textLen);
         onComplete();

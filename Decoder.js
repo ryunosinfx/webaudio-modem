@@ -46,11 +46,13 @@ class Decoder {
     static pad = '0b00000000';
     constructor(
         binVlueThresholdId = 'bin-value-threshold',
+        duplicateStateThresholdId = 'duplicate-state-threshold"',
         outputId = 'output',
         clearId = 'clearBtn',
         codeId = 'code'
     ) {
-        this.binVlueThresholdElm = document.getElementById(binVlueThresholdId);
+        this.binVlueThresholdElm = V.gid(binVlueThresholdId);
+        this.duplicateStateThresholdElm = V.gid(duplicateStateThresholdId);
         this.outputElm = document.getElementById(outputId);
         this.clearbtnElm = document.getElementById(clearId);
         this.codeElm = document.getElementById(codeId);
@@ -58,6 +60,14 @@ class Decoder {
             this.outputElm.value = '';
             e.target.blur();
         });
+        V.ael(this.binVlueThresholdElm, 'change', (e) => {
+            this.setBinVlueThreshold(e.target.value);
+        });
+        this.binVlueThreshold = this.binVlueThresholdElm.value * 1;
+        V.ael(this.duplicateStateThresholdElm, 'change', (e) => {
+            this.setDuplicateVlueThreshold(e.target.value);
+        });
+        this.duplicateVlueThreshold = this.duplicateStateThresholdElm.value * 1;
         // create audio nodes
         const analyser = BaseSetting.audioContext.createAnalyser();
         analyser.fftSize = 512;
@@ -87,9 +97,14 @@ class Decoder {
         const index = Math.floor((f + hzPerBin / 2) / hzPerBin);
         return this.buffer[index];
     }
+    setBinVlueThreshold(threshold) {
+        this.binVlueThreshold = threshold * 1;
+    }
+    setDuplicateVlueThreshold(threshold) {
+        this.duplicateVlueThreshold = threshold * 1;
+    }
     isActive(value) {
-        const threshold = this.binVlueThresholdElm.value * 1;
-        return value > threshold;
+        return value > this.binVlueThreshold;
     }
 
     getState() {
@@ -117,7 +132,7 @@ class Decoder {
         while (true) {
             this.analyser.getByteFrequencyData(this.buffer);
             const state = this.getState();
-            const duplicateThreshold = this.binVlueThresholdElm.value * 1;
+            const duplicateThreshold = this.duplicateVlueThreshold;
             if (state === prevState) {
                 duplicates++;
             } else {
