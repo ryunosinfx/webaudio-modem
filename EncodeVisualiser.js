@@ -19,7 +19,7 @@ class V {
         return V.d.querySelector(selector);
     }
     static gid(id) {
-        return V.getElementById(id);
+        return V.d.getElementById(id);
     }
     static ga(elm, attrName) {
         return elm.getAttribute(attrName);
