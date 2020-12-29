@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>martinmelhus.com - Web Audio Encoder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="WebAudioModem.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>web audio encoder</h1>
+        <div class="tabs">
+            <div class="tab encoder selected" id="encoder">encoder</div>
+            <div class="tab decoder" id="decoder">decoder</div>
+            <div class="tab encoder-visual" id="encoder-visual">encoder (visual)</div>
+            <div class="tab spectrogram" id="spectrogram">spectrogram</div>
+        </div>
+        <div class="tab-body">
+            <div class="encoder selected" id="encoder-body">
+                <h1>encoder</h1>
+                <textarea id="encode-input"></textarea>
+                <p>
+                    <button data-action="encode" id="encode-action">encode</button>
+                    <button data-action="clear" id="encode-clear">clear</button>
+                </p>
+
+                <h2>config</h2>
+                <label for="active-duration">Bit high duration: <span data-val></span> ms</label>
+                <input id="active-duration" type="range" value="100" min="10" , max="1000" , step="10">
+
+                <label for="pause-duration">Pause between bytes: <span data-val></span> ms</label>
+                <input id="pause-duration" type="range" value="20" min="0" , max="500" , step="10">
+            </div>
+            <div class="decoder" id="decoder-body">
+                <h1>decoder</h1>
+                <code id="decode-code">0b00000000</code>
+                <textarea readonly id="decoder-output"></textarea>
+                <p>
+                    <button id="decode-clear">clear</button>
+                </p>
+
+                <h2>config</h2>
+                <label for="bin-value-threshold">Significant bin byte value threshold: <span data-val></span></label>
+                <input id="bin-value-threshold" type="range" value="124" min="1" , max="255" , step="1">
+
+                <label for="duplicate-state-threshold">Output after consecutive duplicate states: <span
+                        data-val></span></label>
+                <input id="duplicate-state-threshold" type="range" value="10" min="1" , max="50" , step="1">
+            </div>
+            <div class="encoder-visual" id="encoder-visual-body">
+                <h1>encoder (visual)</h1>
+                <p>
+                </p>
+                <div class="waveform-container">
+                    <canvas class="waveform" height="40" id="waveform-canvas"></canvas>
+                </div>
+                <div class="trace-container">
+                    <code class="trace-binary" id="trace-binary">0b00000000</code>
+                    <code class="trace-text" id="trace-text"></code>
+                </div>
+                <div class="spectrum-container">
+                    <canvas class="spectrum" height="150" id="spectrum-canvas"></canvas>
+                </div>
+
+                <div id="piano">
+                </div>
+
+                <h2>config</h2>
+                <label for="waveform">waveform:</label>
+                <select id="waveform">
+                    <option value="sine">sine</option>
+                    <option value="square">square</option>
+                    <option value="sawtooth">sawtooth</option>
+                </select>
+            </div>
+            <div class="spectrogram" id="spectrogram-body">
+                <canvas id="spectrogram-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+    <script src="./WebAudioModem.js"></script>
+</body>
+
+</html>
