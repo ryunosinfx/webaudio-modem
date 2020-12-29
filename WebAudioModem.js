@@ -653,16 +653,17 @@ class Spectrogramer {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const microphone = this.audioContext.createMediaStreamSource(stream);
             microphone.connect(this.analyser);
-            this.decode();
+            this.animate();
         } catch (err) {
-            alert('Microphone is required.');
+            console.log(err);
+            alert('Microphone is required at Spectrogramer.');
         }
     }
     getOnResizeCanvasFunc() {
         return () => {
-            const parentNode = this.canvasElm.parentNode;
-            V.sa(this.canvasElm, 'width', parentNode.offsetWidth);
-            V.sa(this.canvasElm, 'height', parentNode.offsetHeight);
+            const parentStyle = window.getComputedStyle(this.canvasElm.parentNode);
+            V.sa(this.canvasElm, 'width', parentStyle.offsetWidth);
+            V.sa(this.canvasElm, 'height', parentStyle.offsetHeight);
             this.WIDTH = this.canvasElm.width * 1;
             this.HEIGHT = this.canvasElm.height * 1;
         };
@@ -692,7 +693,7 @@ class Spectrogramer {
             this.buffer.forEach((x, i) => {
                 const alpha = x / 256.0;
                 this.ctx.fillStyle = `rgba(100, 255, 100, ${alpha})`;
-                this.ctx.fillRect(i * dx, HEIGHT - 1, dx, 1);
+                this.ctx.fillRect(i * dx, this.HEIGHT - 1, dx, 1);
             });
             this.requestID = requestAnimationFrame(draw);
         };
