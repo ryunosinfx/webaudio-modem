@@ -46,6 +46,9 @@ class V {
         }
     }
     static fireEvent(elm, eventType) {
+        if (!elm) {
+            return;
+        }
         // Thanks to https://stackoverflow.com/a/2706236
         if (elm.fireEvent) {
             elm.fireEvent('on' + eventType);
@@ -57,7 +60,8 @@ class V {
     }
 }
 class BaseSetting {
-    static frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
+    static frequenciesb = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
+    static frequencies = [697, 770, 852, 941, 1209, 1336, 1477, 1633];
     static audioContext = window.webkitAudioContext ? new webkitAudioContext() : new AudioContext();
     static getAudioContext() {
         return window.webkitAudioContext ? new webkitAudioContext() : new AudioContext();
@@ -66,58 +70,36 @@ class BaseSetting {
     static pad = '0b00000000';
 }
 V.init();
-class Encoder {
-    constructor(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId) {
-        const encodBtnElm = V.gid(encodBtnId);
-        const clearBtnElm = V.gid(clearBtnId);
-        const encodeInputElm = V.gid(encodeInputId);
-        const pauseDurationElm = V.gid(pauseDurationId);
-        const activeDurationElm = V.gid(activeDurationId);
-        V.ael(encodBtnElm, 'click', async () => {
-            V.sa(encodBtnElm, 'disabled', 'disabled');
-            await this.encode(encodeInputElm.value, () => {
-                encodBtnElm.removeAttribute('disabled');
-            });
-        });
-        V.ael(clearBtnElm, 'click', () => {
-            encodeInputElm.value = '';
-            clearBtnElm.blur();
-        });
-        this.pauseDuration = pauseDurationElm.value * 1;
-        V.ael(pauseDurationElm, 'change', (e) => {
-            this.pauseDuration = e.target.value * 1;
-        });
-        this.activeDuration = activeDurationElm.value * 1;
-        V.ael(activeDurationElm, 'change', (e) => {
-            this.activeDuration = e.target.value * 1;
-        });
-        this.init();
+class Oscillator {
+    constructor(frequencies = BaseSetting.frequencies) {
+        this.frequencies = frequencies;
+        this.inited = false;
     }
     async init() {
+        if (this.inited) {
+            return;
+        }
         this.audioContext = BaseSetting.getAudioContext();
         const masterGain = this.audioContext.createGain();
-        masterGain.gain.value = 1.0 / BaseSetting.frequencies.length;
-        const sinusoids = BaseSetting.frequencies.map((f) => {
-            const oscillator = this.audioContext.createOscillator();
-            oscillator.type = 'sine';
-            oscillator.frequency.value = f;
-            oscillator.start();
-            return oscillator;
-        });
-        const oscillators = BaseSetting.frequencies.map((f) => {
+        masterGain.gain.value = 1.0 / this.frequencies.length;
+        const sinusoids = [];
+        const oscillators = [];
+        for (const frequency of this.frequencies) {
+            const sine = this.audioContext.createOscillator();
+            sine.type = 'square'; //square sine
+            sine.frequency.value = frequency;
+            sine.start();
+            sinusoids.push(sine);
             const volume = this.audioContext.createGain();
             volume.gain.value = 0;
-            return volume;
-        });
-        // connect nodes
-        sinusoids.forEach((sine, i) => {
-            sine.connect(oscillators[i]);
-        });
-        for (const osc of oscillators) {
-            osc.connect(masterGain);
+            oscillators.push(volume);
+            sine.connect(volume);
+            volume.connect(masterGain);
         }
+        // connect nodes
         masterGain.connect(this.audioContext.destination);
         this.oscillators = oscillators;
+        this.inited = true;
     }
     char2oscillators(char) {
         return this.oscillators.filter((_, i) => {
@@ -138,8 +120,6 @@ class Encoder {
         await ProsessUtil.sleep(duration);
         this.mute();
     }
-    stop() {}
-    start() {}
     async encode(text, onComplete) {
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
@@ -147,56 +127,66 @@ class Encoder {
         const chars = text.split('');
         const textLen = chars.length;
         for (let i = 0; i < textLen; i++) {
-            await ProsessUtil.sleep(timeBetweenChars * i);
+            await ProsessUtil.sleep(timeBetweenChars * 1);
             await this.encodeChar(chars[i], duration);
         }
         await ProsessUtil.sleep(timeBetweenChars * textLen);
         onComplete();
     }
 }
-class Decoder {
-    constructor(
-        binVlueThresholdId = 'bin-value-threshold',
-        duplicateStateThresholdId = 'duplicate-state-threshold"',
-        outputId = 'output',
-        clearId = 'clearBtn',
-        codeId = 'code'
-    ) {
-        this.binVlueThresholdElm = V.gid(binVlueThresholdId);
-        this.duplicateStateThresholdElm = V.gid(duplicateStateThresholdId);
-        this.outputElm = V.gid(outputId);
-        this.clearbtnElm = V.gid(clearId);
-        this.codeElm = V.gid(codeId);
-        V.ael(this.clearbtnElm, 'click', (e) => {
-            this.outputElm.value = '';
-            e.target.blur();
+class Encoder {
+    constructor(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId) {
+        this.Oscillator = new Oscillator();
+        const encodBtnElm = V.gid(encodBtnId);
+        const clearBtnElm = V.gid(clearBtnId);
+        const encodeInputElm = V.gid(encodeInputId);
+        const pauseDurationElm = V.gid(pauseDurationId);
+        const activeDurationElm = V.gid(activeDurationId);
+        V.ael(encodBtnElm, 'click', async () => {
+            V.sa(encodBtnElm, 'disabled', 'disabled');
+            await this.Oscillator.encode(encodeInputElm.value, () => {
+                encodBtnElm.removeAttribute('disabled');
+            });
         });
-        V.ael(this.binVlueThresholdElm, 'change', (e) => {
-            this.setBinVlueThreshold(e.target.value);
+        V.ael(clearBtnElm, 'click', () => {
+            encodeInputElm.value = '';
+            clearBtnElm.blur();
         });
-        this.binVlueThreshold = this.binVlueThresholdElm.value * 1;
-        V.ael(this.duplicateStateThresholdElm, 'change', (e) => {
-            this.setDuplicateVlueThreshold(e.target.value);
+        this.Oscillator.pauseDuration = pauseDurationElm.value * 1;
+        V.ael(pauseDurationElm, 'change', (e) => {
+            this.Oscillator.pauseDuration = e.target.value * 1;
         });
-        this.duplicateVlueThreshold = this.duplicateStateThresholdElm.value * 1;
-        this.onOutput = (input) => {
-            this.outputElm.value += input;
-        };
-        this.onTrace = (text) => {
-            this.codeElm.textContent = text;
-        };
-        this.init();
+        this.Oscillator.activeDuration = activeDurationElm.value * 1;
+        V.ael(activeDurationElm, 'change', (e) => {
+            this.Oscillator.activeDuration = e.target.value * 1;
+        });
     }
-    async init() {
+    stop() {}
+    start() {
+        this.Oscillator.init();
+    }
+}
+class Reciver {
+    constructor(
+        frequencies = BaseSetting.frequencies,
+        fftSize = 4096,
+        smoothingTimeConstant = 0.0,
+        minDecibels = -68
+    ) {
+        this.frequencies = frequencies;
         // create audio nodes
         this.audioContext = BaseSetting.getAudioContext();
         const analyser = this.audioContext.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.0;
-        analyser.minDecibels = -58;
+        analyser.fftSize = fftSize;
+        analyser.smoothingTimeConstant = smoothingTimeConstant;
+        analyser.minDecibels = minDecibels;
         this.analyser = analyser;
         // buffer for analyser output
         this.buffer = new Uint8Array(analyser.frequencyBinCount);
+        this.history = [];
+        this.init();
+    }
+    async init() {
         // connect nodes
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -214,33 +204,88 @@ class Decoder {
     setDuplicateVlueThreshold(threshold) {
         this.duplicateVlueThreshold = threshold * 1;
     }
-    // helper functions
-    frequencyBinValue() {
-        return (f) => {
-            const hzPerBin = this.audioContext.sampleRate / (2 * this.analyser.frequencyBinCount);
-            const index = Math.floor((f + hzPerBin / 2) / hzPerBin);
-            return this.buffer[index];
-        };
-    }
-    isActive(value) {
-        return value > this.binVlueThreshold;
-    }
-
     getState() {
-        return BaseSetting.frequencies.map(this.frequencyBinValue()).reduce((acc, val, idx) => {
-            if (this.isActive(val)) {
-                acc += 1 << idx;
+        let acc = 0;
+        let idx = 0;
+        const hzPerBin = this.audioContext.sampleRate / (2 * this.analyser.frequencyBinCount);
+        const list = [];
+        let max = 0;
+        let sum = 0;
+        let count = 0;
+        for (const f of this.frequencies) {
+            const index = Math.floor((f + hzPerBin / 2) / hzPerBin);
+            const value = this.buffer[index];
+            const valueM = this.buffer[index - 2];
+            const valueP = this.buffer[index + 2];
+            const valueM3 = this.buffer[index - 3];
+            const valueP3 = this.buffer[index + 3];
+            if (value > valueM && value > valueP && valueP > valueP3 && valueM > valueM3) {
+                // if (value > this.binVlueThreshold) {
+                //     acc = acc * 1 + (1 << idx) * 1;
+                // }
+                max = max > value ? max : value;
+                sum += value;
+                list.push(value);
+                count++;
+            } else {
+                list.push(0);
             }
-            return acc;
-        }, 0);
+        }
+        let isIncreas = true;
+        let isCheck = false;
+        if (this.history.length > 0) {
+            const old = this.history.shift();
+            if (old) {
+                for (let i = 0, len = old.length; i < len; i++) {
+                    if (old[i] > list[i]) {
+                        isIncreas = false;
+                        break;
+                    }
+                }
+            }
+            isCheck = true;
+        }
+        this.history.push(list);
+        if (max > this.binVlueThreshold && isIncreas && isCheck) {
+            const avg = sum / count;
+            const diff = max - avg;
+            for (const val of list) {
+                if (max - val < avg) {
+                    acc += (1 << idx) * 1;
+                }
+                idx++;
+            }
+        }
+        console.log(
+            'acc:' +
+                acc +
+                '/max:' +
+                max +
+                '/' +
+                this.binVlueThreshold +
+                '/' +
+                this.audioContext.sampleRate +
+                '/' +
+                this.analyser.frequencyBinCount
+        );
+        // this.lastMax =
+        return acc;
     }
-    output(state) {
-        this.onOutput(String.fromCharCode(state % 256));
+    output(states) {
+        const chars = [];
+        while (true) {
+            const state = states.shift();
+            if (!state) {
+                break;
+            }
+            chars.push(String.fromCharCode(state % 256));
+        }
+        this.onOutput(chars.join(''));
     }
     trace(state) {
         const str = state.toString(2);
         const text = BaseSetting.pad.substring(0, BaseSetting.pad.length - str.length) + str;
-        this.onTrace(text);
+        this.onTrace(text + ' ' + state + ' ' + String.fromCharCode(state % 256));
     }
     stop() {
         this.isStop = true;
@@ -252,25 +297,80 @@ class Decoder {
         this.isStop = false;
         let prevState = 0;
         let duplicates = 0;
+        const duplicateThreshold = this.duplicateVlueThreshold;
+        const states = [];
         while (true) {
             this.analyser.getByteFrequencyData(this.buffer);
             const state = this.getState();
-            const duplicateThreshold = this.duplicateVlueThreshold;
-            if (state === prevState) {
-                duplicates++;
+            if (state) {
+                if (state === prevState) {
+                    duplicates++;
+                } else {
+                    setTimeout(() => {
+                        this.trace(state);
+                    });
+                    prevState = state;
+                    duplicates = 0;
+                }
+                if (duplicates === duplicateThreshold) {
+                    states.push(state);
+                    this.history.splice(0, this.history.length);
+                    duplicates = 0;
+                }
             } else {
-                this.trace(state);
                 prevState = state;
                 duplicates = 0;
+                setTimeout(() => {
+                    this.output(states);
+                });
             }
-            if (duplicates === duplicateThreshold) {
-                this.output(state);
-            }
-            await ProsessUtil.sleep(1);
+            await ProsessUtil.sleep(0);
             if (this.isStop) {
                 break;
             }
         }
+    }
+}
+class Decoder {
+    constructor(
+        binVlueThresholdId = 'bin-value-threshold',
+        duplicateStateThresholdId = 'duplicate-state-threshold"',
+        outputId = 'output',
+        clearId = 'clearBtn',
+        codeId = 'code'
+    ) {
+        this.reciver = new Reciver();
+        this.binVlueThresholdElm = V.gid(binVlueThresholdId);
+        this.duplicateStateThresholdElm = V.gid(duplicateStateThresholdId);
+        this.outputElm = V.gid(outputId);
+        this.clearbtnElm = V.gid(clearId);
+        this.codeElm = V.gid(codeId);
+        V.ael(this.clearbtnElm, 'click', (e) => {
+            this.outputElm.value = '';
+            e.target.blur();
+        });
+        V.ael(this.binVlueThresholdElm, 'change', (e) => {
+            this.reciver.setBinVlueThreshold(e.target.value);
+        });
+        this.reciver.binVlueThreshold = this.binVlueThresholdElm.value * 1;
+        V.ael(this.duplicateStateThresholdElm, 'change', (e) => {
+            this.reciver.setDuplicateVlueThreshold(e.target.value);
+        });
+        this.reciver.duplicateVlueThreshold = this.duplicateStateThresholdElm.value * 1;
+        this.reciver.onOutput = (input) => {
+            // console.log(this.outputElm.value + input);
+            this.outputElm.value += input;
+        };
+        this.reciver.onTrace = (text) => {
+            this.codeElm.textContent = text;
+        };
+        this.reciver.stop();
+    }
+    stop() {
+        this.reciver.stop();
+    }
+    start() {
+        this.reciver.start();
     }
 }
 class EncodeVisualiser {
@@ -318,7 +418,7 @@ class EncodeVisualiser {
         this.frequencyBuffer = new Uint8Array(analyser.frequencyBinCount);
         this.oscillators = {};
         this.animateCanvas();
-        // this.stop();
+        this.stop();
     }
     playFrequency(frequency) {
         if (frequency in this.oscillators || this.isStop) {
@@ -349,7 +449,7 @@ class EncodeVisualiser {
     }
     frequencyBinIndex(f) {
         const hzPerBin = this.audioContext.sampleRate / (2 * this.analyser.frequencyBinCount);
-        return Math.floor((f + hzPerBin / 2) / hzPerBin);
+        return parseInt((f + hzPerBin / 2) / hzPerBin);
     }
     drawSpectrum() {
         const rgb02550 = 'rgb(0, 255, 0)';
@@ -555,6 +655,9 @@ class HTMLPianKeyboard {
             for (const frequency of HTMLPianKeyboard.frequencies) {
                 this.release(frequency);
             }
+            for (const frequency of BaseSetting.frequencies) {
+                this.release(frequency);
+            }
         });
         this.init();
     }
@@ -613,17 +716,25 @@ class HTMLPianKeyboard {
     }
 
     byte2frequencies(byte) {
-        return HTMLPianKeyboard.frequencies.filter((_, i) => {
+        return BaseSetting.frequencies.filter((_, i) => {
             return byte & (1 << i);
         });
     }
     press(frequency) {
         const keyElm = V.q(`#${this.pianoId} [data-frequency="${frequency}"]`);
-        V.fireEvent(keyElm, 'mousedown');
+        if (keyElm) {
+            V.fireEvent(keyElm, 'mousedown');
+        } else {
+            this.encodeVisualiser.playFrequency(frequency);
+        }
     }
     release(frequency) {
         const keyElm = V.q(`#${this.pianoId} [data-frequency="${frequency}"]`);
-        V.fireEvent(keyElm, 'mouseup');
+        if (keyElm) {
+            V.fireEvent(keyElm, 'mouseup');
+        } else {
+            this.encodeVisualiser.muteFrequency(frequency);
+        }
     }
 }
 class Spectrogramer {
