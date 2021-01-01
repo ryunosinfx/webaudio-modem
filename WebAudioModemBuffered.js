@@ -318,14 +318,15 @@ class Reciver {
         return list;
     }
     calcTargetIndexes() {
-        const main = [];
+        const targetIndexes = [];
         const hzPerBin = this.audioContext.sampleRate / (2 * this.analyser.frequencyBinCount);
         for (const f of this.frequencies) {
             const index = Math.floor((f + hzPerBin / 2) / hzPerBin);
-            main.push(index);
+            targetIndexes.push(index);
         }
-        return main;
+        return targetIndexes;
     }
+    parse(bufferedData) {}
     async decode() {
         this.isStop = false;
         let prevState = 0;
@@ -342,14 +343,14 @@ class Reciver {
             lastEnd: 0,
             isRecording: false,
         };
-        const mainIndexes = this.calcTargetIndexes();
-        const dataList = [];
+        const targetIndexes = this.calcTargetIndexes();
+        const bufferedData = [];
         while (true) {
             const start = Date.now();
             this.analyser.getByteFrequencyData(this.buffer);
             const selected = this.getTargetData(
                 this.buffer,
-                mainIndexes,
+                targetIndexes,
                 start,
                 this.binVlueThreshold
             );
@@ -359,8 +360,10 @@ class Reciver {
                 state.lastEnd = selectedSate ? start : state.lastEnd;
                 if (start - state.lastEnd > thesholdMsEnd) {
                     state.isRecording = false;
+                    this.parse(bufferedData);
+                    bufferedData.splice(0, bufferedData.length);
                 } else {
-                    dataList.push(selected);
+                    bufferedData.push(selected);
                 }
             } else {
                 state.lastEnd = selectedSate === 255 ? start : state.lastEnd;
