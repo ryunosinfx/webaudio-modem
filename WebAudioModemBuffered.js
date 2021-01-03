@@ -73,6 +73,7 @@ V.init();
 class Oscillator {
     constructor(frequencies = BaseSetting.frequencies) {
         this.frequencies = frequencies;
+        this.frequenciesLen = frequencies.length;
         this.inited = false;
         window.addEventListener('click', (e) => {
             this.init();
@@ -115,26 +116,29 @@ class Oscillator {
         }
     }
     async encodeCharcode(charCode, duration) {
-        const activeOscillators = this.charcode2oscillators(charCode);
-        for (const osc of activeOscillators) {
-            osc.gain.value = 1;
+        // const activeOscillators = this.charcode2oscillators(charCode);
+        for (let i = 0; i < this.frequenciesLen; i++) {
+            const osc = this.oscillators[i];
+            osc.gain.value = charCode & (1 << i) ? 1 : 0;
         }
         await ProsessUtil.sleep(duration);
-        this.mute();
     }
     async encode(text, onComplete) {
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
-        const timeBetweenChars = pause + duration;
+        const timeBetweenChars = (pause + duration) * 1;
         const chars = text.split('');
         const textLen = chars.length;
         await this.encodeCharcode(255, duration * 2);
         for (let i = 0; i < textLen; i++) {
-            await ProsessUtil.sleep(timeBetweenChars * 1);
+            if (timeBetweenChars) {
+                await ProsessUtil.sleep(timeBetweenChars * 1);
+            }
             const char = chars[i];
             const charCode = char.charCodeAt(0);
             await this.encodeCharcode(charCode, duration);
         }
+        this.mute();
         await ProsessUtil.sleep(timeBetweenChars * textLen);
         onComplete();
     }
@@ -205,17 +209,10 @@ class Reciver {
     setBinVlueThreshold(threshold) {
         this.binVlueThreshold = threshold * 1;
     }
-    setDuplicateVlueThreshold(threshold) {
-        this.duplicateVlueThreshold = threshold * 1;
+    setSpanDulation(spanDuration) {
+        this.spanDuration = spanDuration * 1;
     }
     output(chars) {
-        // const chars = [];
-        // for (const state of states) {
-        //     if (!state) {
-        //         continue;
-        //     }
-        //     chars.push(String.fromCharCode(state % 256));
-        // }
         this.onOutput(chars.join(''));
     }
     trace(state) {
@@ -228,30 +225,6 @@ class Reciver {
     }
     start() {
         this.decode();
-    }
-    getTargetData(buf, mainIndexes, now, binVlueThreshold) {
-        const list = [];
-        let max = 0;
-        let min = 255;
-        for (const index of mainIndexes) {
-            const target = buf[index];
-            max = target > max ? target : max;
-            min = target > min ? min : target;
-            list.push(target);
-            list.push(buf[index - 2]);
-            list.push(buf[index + 2]);
-            list.push(buf[index - 3]);
-            list.push(buf[index + 3]);
-        }
-        list.push(now);
-        list.push(
-            max >= binVlueThreshold && min >= binVlueThreshold / 2
-                ? 255
-                : max < binVlueThreshold && min < binVlueThreshold / 2
-                ? 0
-                : 128
-        );
-        return list;
     }
     calcTargetIndexes() {
         const targetIndexes = [];
@@ -294,33 +267,20 @@ class Reciver {
             const time = row.pop();
             const data = [];
             for (let i = 0; i < indexCount; i++) {
-                const index = Math.floor(i / 5);
+                const index = i; //Math.floor(i / 5);
                 const target = row[i];
                 const max = maxes[index];
                 const lastValue = lastBuffers[index];
                 const dValue = target - lastValue;
                 const lastDValue = lastDBuffers[index];
-                const pValue = dValue * lastDValue;
+                const pValue = dValue * (lastDValue === 0 ? 1 : lastDValue);
                 lastDBuffers[index] = dBuffers[index];
                 dBuffers[index] = dValue;
                 lastBuffers[index] = target;
                 maxes[index] = target > max ? target : max;
                 const min = mins[index];
                 mins[index] = min > target ? target : min;
-                i++;
-                const targetM2 = row[i];
-                i++;
-                const targetP2 = row[i];
-                i++;
-                const targetM3 = row[i];
-                i++;
-                const targetP3 = row[i];
-                const isPeak =
-                    target >= targetM2 &&
-                    target >= targetP2 &&
-                    targetP2 > targetP3 &&
-                    targetM2 > targetM3;
-                data.push({ target, isPeak, pValue, lastValue });
+                data.push({ target, pValue, lastValue });
             }
             // console.log('data.length:' + data.length + '/indexCount:' + indexCount);
             const calced = { state, time, data, lastState };
@@ -335,31 +295,35 @@ class Reciver {
         }
         const peakSpanTimes = [];
         let lastPeakTime = 0;
+        let lastByte = 0;
         for (const calced of peakList) {
             let isPeaked = false;
             const data = calced.data;
             const state = calced.state;
             const time = calced.time;
+            let pValues = [];
             for (let i = 0; i < targetIndexCount; i++) {
                 const threshold = thresholds[i];
                 const bitData = data[i];
                 const pValue = bitData.pValue;
                 const lastValue = bitData.lastValue;
-                const isPeak = bitData.isPeak;
-                if (pValue < 0 && lastValue > threshold && !isPeaked && state > 0 && isPeak) {
+                if (pValue < 0 && lastValue > threshold && !isPeaked && state > 0) {
                     isPeaked = true;
                 }
+                pValues.push(pValue < 0 ? -1 : 1 * (lastValue > threshold ? 2 : 1));
             }
+            calced.isPeaked = pValues;
+            const byte = this.readByte(data, thresholds, targetIndexCount);
             if (isPeaked) {
-                if (lastPeakTime) {
+                if (lastPeakTime && byte !== lastByte) {
                     const duration = time - lastPeakTime;
-                    const byte = this.readByte(data, thresholds, targetIndexCount);
                     console.log(data);
-                    console.log(byte);
+                    console.log(byte + '/' + byte);
                     peakSpanTimes.push((cap + duration) * 1 + delimiter + time + delimiter + byte);
                 }
                 lastPeakTime = time;
             }
+            lastByte = byte;
         }
         peakSpanTimes.sort();
         const peakSpanCount = peakSpanTimes.length;
@@ -376,7 +340,7 @@ class Reciver {
         console.log(maxes);
         console.log(thresholds);
         console.log(peakSpanTimes);
-        console.log(peakSpanTimes.slice(1, 4));
+        // console.log(peakSpanTimes.slice(1, 4));
         console.log(peakSpans);
         if (peakSpans.length < 1) {
             return;
@@ -392,7 +356,8 @@ class Reciver {
         }
         const maxKey = this.getMaxCountKey(countMap);
         const firstPeakTime = peakMap[maxKey];
-        const spanDuration = Math.floor(maxKey / spanUnitMs) * spanUnitMs;
+        const spanDuration = this.spanDuration * 2;
+        Math.floor(maxKey / spanUnitMs) * spanUnitMs;
         const diff = firstPeakTime - firstTime;
         const offset = diff - Math.floor(diff / spanDuration) * spanDuration;
         let parseCounter = 1;
@@ -402,10 +367,14 @@ class Reciver {
         );
         const startTime = firstTime + offset;
         const cache = {};
+        let weight = '';
+        let lastChar = null;
+        let firstChangeChar = null;
         for (const calced of peakList) {
             const data = calced.data;
             const state = calced.state;
             const lastState = calced.lastState;
+            const isPeaked = calced.isPeaked;
             const time = calced.time;
             const nextPeakTime = startTime + spanDuration * parseCounter + spanDuration / 2;
             const diff = nextPeakTime - time - spanDuration / 2;
@@ -414,26 +383,47 @@ class Reciver {
             console.log(
                 diff +
                     '/' +
+                    time +
+                    '/' +
                     Math.floor((time - startTime) / spanDuration) +
-                    '/offset:' +
-                    offset +
+                    // '/offset:' +
+                    // offset +
                     '/state:' +
                     state +
-                    '/char:' +
+                    '/pc:' +
+                    parseCounter +
+                    // '/lastState:' +
+                    // lastState +
+                    '/ls:' +
+                    lastState +
+                    '/c:' +
                     char +
-                    '/byte:' +
-                    byte
+                    '/b:' +
+                    byte +
+                    '/isPeaked:' +
+                    isPeaked
             );
             const isReadable = state > 0 || lastState > 0;
             if (isReadable && CHARS.test(char)) {
-                cache[char] = cache[char] ? cache[char] + 1 : 1;
+                weight = spanDuration / 2 - Math.abs(diff);
+                firstChangeChar = !firstChangeChar && char !== lastChar ? char : firstChangeChar;
+                const currentWeight =
+                    char !== lastChar
+                        ? firstChangeChar === char
+                            ? weight * 5
+                            : weight * 2
+                        : weight;
+                cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
             }
             if (nextPeakTime <= time) {
                 const targetChar = this.getMaxCountKey(cache);
-                console.log(nextPeakTime + '/' + time + '/' + targetChar);
+                console.log(nextPeakTime + '/' + time + '/' + targetChar + '/' + parseCounter);
                 parseCounter++;
                 if (targetChar !== null) {
                     parsed.push(targetChar);
+                    lastChar = targetChar;
+                    weight = 1;
+                    firstChangeChar = null;
                 }
                 this.clearMap(cache);
             }
@@ -488,20 +478,30 @@ class Reciver {
         const indexCount = targetIndexes.length * 5;
         const targetIndexCount = this.frequencies.length;
         const bufferedData = [];
+        const binVlueThreshold = this.binVlueThreshold;
         console.log('decode');
         while (true) {
             const start = Date.now();
             this.analyser.getByteFrequencyData(buffer);
-            const selected = this.getTargetData(
-                buffer,
-                targetIndexes,
-                start,
-                this.binVlueThreshold
-            );
+            const selected = [];
+            let max = 0;
+            let min = 255;
+            for (const index of targetIndexes) {
+                const target = buffer[index];
+                max = target > max ? target : max;
+                min = target > min ? min : target;
+                selected.push(target);
+            }
+            selected.push(start);
+            const selectedSate =
+                max >= binVlueThreshold && min >= binVlueThreshold / 2
+                    ? 255
+                    : max < binVlueThreshold && min < binVlueThreshold / 2
+                    ? 0
+                    : 128;
+            selected.push(selectedSate);
             // console.log('state.isRecording:' + state.isRecording);
-            const stateIndex = selected.length - 1;
-            const selectedSate = selected[stateIndex];
-            console.log('state.isRecording:' + state.isRecording + '/selectedSate:' + selectedSate);
+            // console.log('state.isRecording:' + state.isRecording + '/selectedSate:' + selectedSate);
             if (state.isRecording) {
                 state.lastEnd = selectedSate ? start : state.lastEnd;
                 if (start - state.lastEnd > thesholdMsEnd) {
@@ -533,14 +533,14 @@ class Reciver {
 class Decoder {
     constructor(
         binVlueThresholdId = 'bin-value-threshold',
-        duplicateStateThresholdId = 'duplicate-state-threshold"',
+        spanDulationId = 'span-dulation',
         outputId = 'output',
         clearId = 'clearBtn',
         codeId = 'code'
     ) {
         this.reciver = new Reciver();
         this.binVlueThresholdElm = V.gid(binVlueThresholdId);
-        this.duplicateStateThresholdElm = V.gid(duplicateStateThresholdId);
+        this.spanDulationElm = V.gid(spanDulationId);
         this.outputElm = V.gid(outputId);
         this.clearbtnElm = V.gid(clearId);
         this.codeElm = V.gid(codeId);
@@ -552,10 +552,10 @@ class Decoder {
             this.reciver.setBinVlueThreshold(e.target.value);
         });
         this.reciver.binVlueThreshold = this.binVlueThresholdElm.value * 1;
-        V.ael(this.duplicateStateThresholdElm, 'change', (e) => {
-            this.reciver.setDuplicateVlueThreshold(e.target.value);
+        V.ael(this.spanDulationElm, 'change', (e) => {
+            this.reciver.setSpanDulation(e.target.value);
         });
-        this.reciver.duplicateVlueThreshold = this.duplicateStateThresholdElm.value * 1;
+        this.reciver.spanDuration = this.spanDulationElm.value * 1;
         this.reciver.onOutput = (input) => {
             // console.log(this.outputElm.value + input);
             this.outputElm.value += input;
@@ -583,14 +583,8 @@ class WebAudioModem {
             return this.decoder;
         };
     }
-    buildDecoder(binVlueThresholdId, duplicateStateThresholdId, outputId, clearId, codeId) {
-        this.decoder = new Decoder(
-            binVlueThresholdId,
-            duplicateStateThresholdId,
-            outputId,
-            clearId,
-            codeId
-        );
+    buildDecoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId) {
+        this.decoder = new Decoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId);
     }
     buildEncoder(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId) {
         this.encoder = new Encoder(
@@ -651,11 +645,11 @@ const tabIds = ['encoder', 'decoder'];
 const wam = new WebAudioModem(tabIds);
 new WebAudioModemView(tabIds, wam);
 const binVlueThresholdId = 'bin-value-threshold';
-const duplicateStateThresholdId = 'duplicate-state-threshold';
+const spanDurationId = 'span-duration';
 const outputId = 'decoder-output';
 const clearId = 'decode-clear';
 const codeId = 'decode-code';
-wam.buildDecoder(binVlueThresholdId, duplicateStateThresholdId, outputId, clearId, codeId);
+wam.buildDecoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId);
 const encodBtnId = 'encode-action';
 const encodeInputId = 'encode-input';
 const clearBtnId = 'encode-clear';
