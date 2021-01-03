@@ -131,8 +131,8 @@ class Oscillator {
         const textLen = chars.length;
         await this.encodeCharcode(255, duration * 2);
         for (let i = 0; i < textLen; i++) {
-            if (timeBetweenChars) {
-                await ProsessUtil.sleep(timeBetweenChars * 1);
+            if (pause) {
+                await ProsessUtil.sleep(pause * 1);
             }
             const char = chars[i];
             const charCode = char.charCodeAt(0);
@@ -336,7 +336,6 @@ class Reciver {
                       Math.floor(peakSpanCount / 10) - 1,
                       Math.floor(peakSpanCount / 90) - 2
                   );
-        let accumulator = 0;
         console.log(maxes);
         console.log(thresholds);
         console.log(peakSpanTimes);
@@ -356,10 +355,11 @@ class Reciver {
         }
         const maxKey = this.getMaxCountKey(countMap);
         const firstPeakTime = peakMap[maxKey];
-        const spanDuration = this.spanDuration * 2;
+        const spanDuration = this.spanDuration * 1;
         Math.floor(maxKey / spanUnitMs) * spanUnitMs;
         const diff = firstPeakTime - firstTime;
-        const offset = diff - Math.floor(diff / spanDuration) * spanDuration;
+        const spanOffset = Math.ceil(spanDuration / 1.5);
+        const offset = diff - Math.floor(diff / spanDuration) * spanDuration + spanOffset;
         let parseCounter = 1;
         const parsed = [];
         console.log(
@@ -376,8 +376,8 @@ class Reciver {
             const lastState = calced.lastState;
             const isPeaked = calced.isPeaked;
             const time = calced.time;
-            const nextPeakTime = startTime + spanDuration * parseCounter + spanDuration / 2;
-            const diff = nextPeakTime - time - spanDuration / 2;
+            const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
+            const diff = nextPeakTime - time - spanOffset;
             const byte = this.readByte(data, thresholds, targetIndexCount);
             const char = String.fromCharCode(byte % 256);
             console.log(
@@ -411,7 +411,7 @@ class Reciver {
                     char !== lastChar
                         ? firstChangeChar === char
                             ? weight * 5
-                            : weight * 2
+                            : weight * 4
                         : weight;
                 cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
             }
