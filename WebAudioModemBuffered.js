@@ -7,6 +7,180 @@ class ProsessUtil {
         });
     }
 }
+const max = 50000;
+const RB64Regex = /^[0-9a-zA-Z/\+]+[=]{0,3}$/;
+class B64Util {
+    static from64(d) {
+        const b = B64Util.b64ToU8a(d);
+        const u16a = new Uint16Array(b.buffer);
+        const l = u16a.length;
+        const c = Math.ceil(l / max);
+        const r = [];
+        for (let j = 0; j < c; j++) {
+            const start = max * j;
+            const size = l - start;
+            const p = size > max ? max : size > 0 ? size : l;
+            const u = u16a.slice(start, start + p);
+            r.push(String.fromCharCode(...u));
+        }
+        return r.join('');
+    }
+    static to64(s) {
+        const len = s.length;
+        const pageNum = Math.ceil(len / max);
+        const results = [];
+        for (let j = 0; j < pageNum; j++) {
+            const start = max * j;
+            const size = len - start;
+            const p = size > max ? max : size > 0 ? size : len;
+            const end = start + p;
+            const input = s.substring(start, end);
+            const u = new Uint16Array(p);
+            for (let i = 0; i < p; i++) {
+                u[i] = input.charCodeAt(i);
+            }
+            const c = String.fromCharCode(...new Uint8Array(u.buffer));
+            results.push(c);
+        }
+        return btoa(results.join(''));
+    }
+    static b64ToU8a(d) {
+        const a = atob(d);
+        const b = new Uint8Array(a.length);
+        for (let i = 0; i < b.length; i++) {
+            try {
+                b[i] = a.charCodeAt(i);
+            } catch (e) {
+                console.log(i);
+                console.log(e);
+            }
+        }
+        return b;
+    }
+    static u8a2b64(u8a) {
+        const bs = u8a ? B64Util.u8a2bs(u8a) : null;
+        return bs ? btoa(bs) : null;
+    }
+    static s2u8a(s) {
+        const d = B64Util.to64(s);
+        return B64Util.b64ToU8a(d);
+    }
+    static s2hex(s) {
+        const d = B64Util.to64(s);
+        const hex = B64Util.b64toHex(d);
+        console.log(B64Util.hex2s(hex));
+        return hex;
+    }
+    static hex2s(hex) {
+        const u8a = B64Util.hex2u8a(hex);
+        console.log(u8a);
+        const bs = B64Util.u8a2bs(u8a);
+        console.log(bs);
+        const d = B64Util.aToB64(u8a.buffer);
+        console.log(d);
+        return B64Util.from64(d);
+    }
+    static b64uToAb(b) {
+        const d = B64Util.toB64(b);
+        return B64Util.b64ToU8a(d).buffer;
+    }
+    static u8a2bs(u8a) {
+        const r = [];
+        for (let e of u8a) {
+            r.push(String.fromCharCode(e));
+        }
+        return r.join('');
+    }
+    static hex2u8a(hex) {
+        return new Uint8Array(
+            hex.match(/[0-9a-f]{2}/gi).map((h) => {
+                return parseInt(h, 16);
+            })
+        );
+    }
+
+    static ab2bs(ab) {
+        return B64Util.u8a2bs(new Uint8Array(ab));
+    }
+    static aToB64(ai) {
+        const ab = ai.buffer ? ai.buffer : ai;
+        return btoa(B64Util.ab2bs(ab));
+    }
+    static aToB64u(ai) {
+        const b = B64Util.aToB64(ai);
+        return B64Util.toB64u(b);
+    }
+    static b64toHex(b64) {
+        console.log(b64);
+        const u8a = B64Util.b64ToU8a(b64);
+        console.log(u8a);
+        return B64Util.aToHex(u8a);
+    }
+    static aToHex(ai) {
+        const u8a = ai.buffer ? new Uint8Array(ai.buffer) : new Uint8Array(ai);
+        const rl = [];
+        for (let i of u8a) {
+            const a = i.toString(16);
+            rl.push(('00' + a).slice(-2));
+        }
+        return rl.join('');
+    }
+    static bs2u8a(bs) {
+        const l = bs.length;
+        const a = new Uint8Array(new ArrayBuffer(l));
+        for (let i = 0; i < l; i++) {
+            a[i] = bs.charCodeAt(i);
+        }
+        return a;
+    }
+    static isB64(d) {
+        return d && typeof d === 'string' && d.length % 4 === 0 && RB64Regex.test(d);
+    }
+    static bs2utf8(bs) {
+        const u8a = B64Util.bs2u8a(bs);
+        return td.decode(u8a.buffer);
+    }
+    static dataURI2bs(dURI) {
+        return atob(dURI.split(',')[1]);
+    }
+    static dataURI2u8a(dURI) {
+        return B64Util.bs2u8a(atob(dURI.split(',')[1]));
+    }
+    static ab2dataURI(ab, type = 'application/octet-stream') {
+        const b = btoa(B64Util.ab2bs(ab));
+        return 'data:' + type + ';base64,' + b;
+    }
+    static joinU8as(u8as) {
+        let l = 0;
+        for (let u8a of u8as) {
+            l += u8a.length;
+        }
+        const r = new Uint8Array(l);
+        let s = 0;
+        for (let u8a of u8as) {
+            r.set(u8a, s);
+            s += u8a.length;
+        }
+        return r;
+    }
+    static toB64u(b) {
+        return b ? b.split('+').join('-').split('/').join('_').split('=').join('') : b;
+    }
+    static toB64(b64u) {
+        const l = b64u.length;
+        const c = l % 4 > 0 ? 4 - (l % 4) : 0;
+        let b = b64u.split('-').join('+').split('_').join('/');
+
+        for (let i = 0; i < c; i++) {
+            b += '=';
+        }
+        return b;
+    }
+    static async sig(u8a) {
+        const bs = B64Util.u8a2bs(u8a);
+        return Hasher.sha256(bs, 1, 'hex');
+    }
+}
 class V {
     static d = document;
     static b = document.body;
@@ -105,38 +279,65 @@ class Oscillator {
         this.oscillators = oscillators;
         this.inited = true;
     }
-    charcode2oscillators(charCode) {
-        return this.oscillators.filter((_, i) => {
-            return charCode & (1 << i);
-        });
-    }
     mute() {
         for (const osc of this.oscillators) {
             osc.gain.value = 0;
         }
     }
     async encodeCharcode(charCode, duration) {
-        // const activeOscillators = this.charcode2oscillators(charCode);
         for (let i = 0; i < this.frequenciesLen; i++) {
             const osc = this.oscillators[i];
             osc.gain.value = charCode & (1 << i) ? 1 : 0;
         }
         await ProsessUtil.sleep(duration);
     }
+    convertTextToHaming(text) {
+        const result = [];
+        const hex = B64Util.s2hex(text);
+        console.log(hex);
+        let idx = 0;
+        for (const char of hex) {
+            idx++;
+            const bits = ('0000' + parseInt(char, 16).toString(2)).slice(-4).split('');
+            const b1 = bits[0] * 1;
+            const b2 = bits[1] * 1;
+            const b3 = bits[2] * 1;
+            const b4 = bits[3] * 1;
+            const c1 = (b1 + b2 + b3) % 2;
+            const c2 = (b1 + b3 + b4) % 2;
+            const c3 = (b2 + b3 + b4) % 2;
+            const i = (b1 + b2 + b3 + b4 + c1 + c2 + c3) % 2;
+            const p = i * 1 ? 0 : 1;
+            const byte = '' + p + b1 + b2 + b3 + b4 + c1 + c2 + c3;
+            // console.log(byte + '/' + parseInt(byte, 2));
+            result.push(parseInt(byte, 2));
+        }
+        return result;
+    }
     async encode(text, onComplete) {
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
         const timeBetweenChars = (pause + duration) * 1;
-        const chars = text.split('');
-        const textLen = chars.length;
+        // const chars = text.split('');
+        const hamings = this.convertTextToHaming(text);
+        console.log(hamings);
+        const textLen = hamings.length;
         await this.encodeCharcode(255, duration * 2);
+        const start = Date.now();
+        let currentDuration = timeBetweenChars;
+        const dd = timeBetweenChars * 2;
+        const offset = start % timeBetweenChars;
+        const times = Math.floor(start / timeBetweenChars);
         for (let i = 0; i < textLen; i++) {
+            const target = (times + i) * timeBetweenChars + offset;
             if (pause) {
                 await ProsessUtil.sleep(pause * 1);
             }
-            const char = chars[i];
-            const charCode = char.charCodeAt(0);
-            await this.encodeCharcode(charCode, duration);
+            // const char = hamings[i];
+            // const charCode = char.charCodeAt(0);
+            await this.encodeCharcode(hamings[i], currentDuration);
+            const now = Date.now();
+            currentDuration = dd - (now - target);
         }
         this.mute();
         await ProsessUtil.sleep(timeBetweenChars * textLen);
@@ -213,7 +414,10 @@ class Reciver {
         this.spanDuration = spanDuration * 1;
     }
     output(chars) {
-        this.onOutput(chars.join(''));
+        const hex = chars.join('');
+        console.log(hex);
+        const text = B64Util.hex2s(hex);
+        this.onOutput(text);
     }
     trace(state) {
         const str = state.toString(2);
@@ -234,6 +438,53 @@ class Reciver {
             targetIndexes.push(index);
         }
         return targetIndexes;
+    }
+    valitadeHaming(charCode) {
+        const bits = ('00000000' + charCode.toString(2)).slice(-8).split('');
+        const i = bits[0];
+        const b1 = bits[1] * 1;
+        const b2 = bits[2] * 1;
+        const b3 = bits[3] * 1;
+        const b4 = bits[4] * 1;
+        const c1 = bits[5] * 1;
+        const c2 = bits[6] * 1;
+        const c3 = bits[7] * 1;
+        const s1 = (b1 + b2 + b3 + c1) % 2;
+        const s2 = (b1 + b3 + b4 + c2) % 2;
+        const s3 = (b2 + b3 + b4 + c3) % 2;
+        const p = (b1 + b2 + b3 + b4 + c1 + c2 + c3) % 2;
+        let hex = '';
+        let bit = '';
+        let isFailed = false;
+        const codn = s1 * 1 + s2 * 2 + s3 * 4;
+        const isValid = p * 1 === (i * 1 ? 0 : 1);
+        const codnSuccess = codn * 1 === 0;
+        if (codnSuccess && isValid) {
+            bit = '' + b1 + b2 + b3 + b4;
+            isFailed = 0;
+        } else if (!codnSuccess && !isValid) {
+            if (codn === 3) {
+                const a = b1 ? 0 : 1;
+                bit = '' + a + b2 + b3 + b4;
+            } else if (codn === 5) {
+                const a = b2 ? 0 : 1;
+                bit = '' + b1 + a + b3 + b4;
+            } else if (codn === 7) {
+                const a = b3 ? 0 : 1;
+                bit = '' + b1 + b2 + a + b4;
+            } else if (codn === 6) {
+                const a = b4 ? 0 : 1;
+                bit = '' + b1 + b2 + b3 + a;
+            } else {
+                bit = '' + b1 + b2 + b3 + b4;
+            }
+            isFailed = 0;
+        } else {
+            isFailed = 1;
+            bit = '' + b1 + b2 + b3 + b4;
+        }
+        hex = parseInt(bit, 2).toString(16);
+        return { i, hex, isFailed, bit, p, codn };
     }
     parse(bufferedData, indexCount, targetIndexCount) {
         console.log(
@@ -351,7 +602,6 @@ class Reciver {
             const value = Math.round((tokens[0] * 1 - cap) / spanUnitMs) * spanUnitMs;
             countMap[value] = countMap[value] ? countMap[value] + 1 : 1;
             peakMap[value] = peakMap[value] ? peakMap[value] : tokens[1] * 1;
-            accumulator += value;
         }
         const maxKey = this.getMaxCountKey(countMap);
         const firstPeakTime = peakMap[maxKey];
@@ -359,7 +609,7 @@ class Reciver {
         Math.floor(maxKey / spanUnitMs) * spanUnitMs;
         const diff = firstPeakTime - firstTime;
         const spanOffset = Math.ceil(spanDuration / 1.5);
-        const offset = diff - Math.floor(diff / spanDuration) * spanDuration + spanOffset;
+        const offset = Math.ceil(spanDuration * 1.1); // diff - Math.floor(diff / spanDuration) * spanDuration;
         let parseCounter = 1;
         const parsed = [];
         console.log(
@@ -379,7 +629,8 @@ class Reciver {
             const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
             const diff = nextPeakTime - time - spanOffset;
             const byte = this.readByte(data, thresholds, targetIndexCount);
-            const char = String.fromCharCode(byte % 256);
+            const hamingResult = this.valitadeHaming(byte);
+            const char = hamingResult.hex;
             console.log(
                 diff +
                     '/' +
@@ -398,20 +649,31 @@ class Reciver {
                     lastState +
                     '/c:' +
                     char +
+                    '/bit:' +
+                    hamingResult.bit +
+                    '/i:' +
+                    hamingResult.i +
+                    '/p:' +
+                    hamingResult.p +
+                    '/codn:' +
+                    hamingResult.codn +
                     '/b:' +
                     byte +
                     '/isPeaked:' +
-                    isPeaked
+                    isPeaked +
+                    '/' +
+                    hamingResult.isFailed
             );
             const isReadable = state > 0 || lastState > 0;
-            if (isReadable && CHARS.test(char)) {
-                weight = spanDuration / 2 - Math.abs(diff);
-                firstChangeChar = !firstChangeChar && char !== lastChar ? char : firstChangeChar;
+            if (isReadable && !hamingResult.isFailed) {
+                weight = spanDuration - Math.abs(diff);
+                firstChangeChar =
+                    firstChangeChar === null && char !== lastChar ? char : firstChangeChar;
                 const currentWeight =
                     char !== lastChar
                         ? firstChangeChar === char
-                            ? weight * 5
-                            : weight * 4
+                            ? weight * 2
+                            : weight * 1
                         : weight;
                 cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
             }
