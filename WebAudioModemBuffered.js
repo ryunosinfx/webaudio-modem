@@ -656,7 +656,7 @@ class Reciver {
                 // );
                 const isReadable = state > 0 || lastState > 0;
                 if (isReadable) {
-                    weight = spanDuration * 2 - Math.abs(diff);
+                    weight = spanDuration + 20 - Math.abs(diff);
                     firstChangeChar =
                         firstChangeChar === null && char !== lastChar ? char : firstChangeChar;
                     const currentWeight =
