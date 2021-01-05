@@ -11,8 +11,11 @@ const max = 50000;
 const RB64Regex = /^[0-9a-zA-Z/\+]+[=]{0,3}$/;
 class B64Util {
     static from64(d) {
+        const a = new Uint8Array(1);
+        a.fill(0);
         const b = B64Util.b64ToU8a(d);
-        const u16a = new Uint16Array(b.buffer);
+        const u8a = b.length % 2 ? B64Util.joinU8as([b, a]) : b;
+        const u16a = new Uint16Array(u8a.buffer);
         const l = u16a.length;
         const c = Math.ceil(l / max);
         const r = [];
@@ -495,10 +498,6 @@ class Reciver {
                 '/targetIndexCount:' +
                 targetIndexCount
         );
-        const CHARS = /[-_0-9a-zA-Z]/;
-        const spanUnitMs = 10;
-        const cap = 1000000;
-        const delimiter = ':';
         const peakList = [];
         const maxes = new Uint8Array(targetIndexCount);
         maxes.fill(0);
@@ -544,154 +543,210 @@ class Reciver {
             const threshold = max * 0.9;
             thresholds.push(threshold);
         }
-        const peakSpanTimes = [];
-        let lastPeakTime = 0;
-        let lastByte = 0;
-        for (const calced of peakList) {
-            let isPeaked = false;
-            const data = calced.data;
-            const state = calced.state;
-            const time = calced.time;
-            let pValues = [];
-            for (let i = 0; i < targetIndexCount; i++) {
-                const threshold = thresholds[i];
-                const bitData = data[i];
-                const pValue = bitData.pValue;
-                const lastValue = bitData.lastValue;
-                if (pValue < 0 && lastValue > threshold && !isPeaked && state > 0) {
-                    isPeaked = true;
-                }
-                pValues.push(pValue < 0 ? -1 : 1 * (lastValue > threshold ? 2 : 1));
-            }
-            calced.isPeaked = pValues;
-            const byte = this.readByte(data, thresholds, targetIndexCount);
-            if (isPeaked) {
-                if (lastPeakTime && byte !== lastByte) {
-                    const duration = time - lastPeakTime;
-                    console.log(data);
-                    console.log(byte + '/' + byte);
-                    peakSpanTimes.push((cap + duration) * 1 + delimiter + time + delimiter + byte);
-                }
-                lastPeakTime = time;
-            }
-            lastByte = byte;
-        }
-        peakSpanTimes.sort();
-        const peakSpanCount = peakSpanTimes.length;
-        const peakSpans =
-            peakSpanCount < 5
-                ? peakSpanTimes
-                : peakSpanCount < 10
-                ? peakSpanTimes.slice(1, peakSpanCount - 2)
-                : peakSpanTimes.slice(
-                      Math.floor(peakSpanCount / 10) - 1,
-                      Math.floor(peakSpanCount / 90) - 2
-                  );
         console.log(maxes);
         console.log(thresholds);
-        console.log(peakSpanTimes);
-        // console.log(peakSpanTimes.slice(1, 4));
-        console.log(peakSpans);
-        if (peakSpans.length < 1) {
+        if (bufferedData.length < 1) {
             return;
         }
-        const countMap = {};
-        const peakMap = {};
-        for (const peakSpan of peakSpans) {
-            const tokens = peakSpan.split(delimiter);
-            const value = Math.round((tokens[0] * 1 - cap) / spanUnitMs) * spanUnitMs;
-            countMap[value] = countMap[value] ? countMap[value] + 1 : 1;
-            peakMap[value] = peakMap[value] ? peakMap[value] : tokens[1] * 1;
-        }
-        const maxKey = this.getMaxCountKey(countMap);
-        const firstPeakTime = peakMap[maxKey];
         const spanDuration = this.spanDuration * 1;
-        Math.floor(maxKey / spanUnitMs) * spanUnitMs;
-        const diff = firstPeakTime - firstTime;
-        const spanOffset = Math.ceil(spanDuration / 1.5);
-        const offset = Math.ceil(spanDuration * 1.1); // diff - Math.floor(diff / spanDuration) * spanDuration;
-        let parseCounter = 1;
-        const parsed = [];
+        const offset = Math.ceil(spanDuration * 1.1);
         console.log(
-            'offset:' + offset + '/spanDuration:' + spanDuration + '/firstPeakTime:' + firstPeakTime
+            'offset:' + offset + '/spanDuration:' + spanDuration
+            //+ '/firstPeakTime:' + firstPeakTime
         );
         const startTime = firstTime + offset;
-        const cache = {};
-        let weight = '';
+        const charContinuous = [];
         let lastChar = null;
-        let firstChangeChar = null;
+        let startUnixTime = Date.now();
+        let endUnixTime = 0;
         for (const calced of peakList) {
             const data = calced.data;
-            const state = calced.state;
-            const lastState = calced.lastState;
-            const isPeaked = calced.isPeaked;
             const time = calced.time;
-            const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
-            const diff = nextPeakTime - time - spanOffset;
             const byte = this.readByte(data, thresholds, targetIndexCount);
             const hamingResult = this.valitadeHaming(byte);
             const char = hamingResult.hex;
-            console.log(
-                diff +
-                    '/' +
-                    time +
-                    '/' +
-                    Math.floor((time - startTime) / spanDuration) +
-                    // '/offset:' +
-                    // offset +
-                    '/state:' +
-                    state +
-                    '/pc:' +
-                    parseCounter +
-                    // '/lastState:' +
-                    // lastState +
-                    '/ls:' +
-                    lastState +
-                    '/c:' +
-                    char +
-                    '/bit:' +
-                    hamingResult.bit +
-                    '/i:' +
-                    hamingResult.i +
-                    '/p:' +
-                    hamingResult.p +
-                    '/codn:' +
-                    hamingResult.codn +
-                    '/b:' +
-                    byte +
-                    '/isPeaked:' +
-                    isPeaked +
-                    '/' +
-                    hamingResult.isFailed
-            );
+            calced.hamingResult = hamingResult;
+            calced.byte = byte;
+            const state = calced.state;
+            const lastState = calced.lastState;
             const isReadable = state > 0 || lastState > 0;
-            if (isReadable && !hamingResult.isFailed) {
-                weight = spanDuration - Math.abs(diff);
-                firstChangeChar =
-                    firstChangeChar === null && char !== lastChar ? char : firstChangeChar;
-                const currentWeight =
-                    char !== lastChar
-                        ? firstChangeChar === char
-                            ? weight * 2
-                            : weight * 1
-                        : weight;
-                cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
+            if (!isReadable) {
+                continue;
             }
-            if (nextPeakTime <= time) {
-                const targetChar = this.getMaxCountKey(cache);
-                console.log(nextPeakTime + '/' + time + '/' + targetChar + '/' + parseCounter);
-                parseCounter++;
-                if (targetChar !== null) {
-                    parsed.push(targetChar);
-                    lastChar = targetChar;
+            if (!hamingResult.isFailed) {
+                startUnixTime = time > startUnixTime ? startUnixTime : time;
+                endUnixTime = time > endUnixTime ? time : endUnixTime;
+            }
+            if (char === lastChar) {
+                charContinuous.push(hamingResult);
+            } else {
+                let isSuccess = false;
+                for (const hamingResult of charContinuous) {
+                    if (!hamingResult.isFailed) {
+                        isSuccess = true;
+                        break;
+                    }
+                }
+                if (isSuccess) {
+                    for (const hamingResult of charContinuous) {
+                        hamingResult.isFailed = 0;
+                    }
+                }
+                charContinuous.splice(0, charContinuous.length);
+            }
+            lastChar = char;
+        }
+        const targetCharCount = Math.floor((endUnixTime - startUnixTime) / spanDuration);
+        console.log(peakList);
+        const parsedCounts = {};
+        const parsedMax = {};
+        const cache = {};
+        const cacheNulls = {};
+        for (let k = 0; k < 5; k++) {
+            console.log('k:' + k);
+            const parsed = [];
+            let parseCounter = 1;
+            let weight = '';
+            let lastChar = null;
+            let firstChangeChar = null;
+            let changeCount = 0;
+            let nullsCount = 0;
+            let samplingCount = 0;
+            const spanOffset = Math.ceil(spanDuration / 0.9) + 3 * k;
+            for (const calced of peakList) {
+                const state = calced.state;
+                const lastState = calced.lastState;
+                const time = calced.time;
+                const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
+                const diff = nextPeakTime - time - spanOffset;
+                const hamingResult = calced.hamingResult;
+                const char = hamingResult.hex;
+                // console.log(
+                //     diff +
+                //         '/' +
+                //         time +
+                //         '/' +
+                //         Math.floor((time - startTime) / spanDuration) +
+                //         // '/offset:' +
+                //         // offset +
+                //         '/state:' +
+                //         state +
+                //         '/pc:' +
+                //         parseCounter +
+                //         // '/lastState:' +
+                //         // lastState +
+                //         '/ls:' +
+                //         lastState +
+                //         '/c:' +
+                //         char +
+                //         '/bit:' +
+                //         hamingResult.bit +
+                //         '/i:' +
+                //         hamingResult.i +
+                //         '/p:' +
+                //         hamingResult.p +
+                //         '/codn:' +
+                //         hamingResult.codn +
+                //         '/b:' +
+                //         calced.splicedcxbyte +
+                //         // '/isPeaked:' +
+                //         // isPeaked +
+                //         '/' +
+                //         hamingResult.isFailed
+                // );
+                const isReadable = state > 0 || lastState > 0;
+                if (isReadable) {
+                    weight = spanDuration * 2 - Math.abs(diff);
+                    firstChangeChar =
+                        firstChangeChar === null && char !== lastChar ? char : firstChangeChar;
+                    const currentWeight =
+                        char !== lastChar
+                            ? firstChangeChar === char
+                                ? weight * 2
+                                : weight * 1
+                            : weight;
+                    if (!hamingResult.isFailed) {
+                        cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
+                    } else {
+                        cacheNulls[char] = cacheNulls[char]
+                            ? cacheNulls[char] + currentWeight
+                            : currentWeight;
+                    }
+                }
+                if (nextPeakTime <= time) {
+                    const targetChar = this.getMaxCountKey(cache);
+                    const targetCharNulls = this.getMaxCountKey(cacheNulls);
+                    console.log(
+                        nextPeakTime +
+                            '/' +
+                            time +
+                            '/' +
+                            targetChar +
+                            '/' +
+                            targetCharNulls +
+                            '/' +
+                            parseCounter +
+                            '/isReadable:' +
+                            isReadable +
+                            '/' +
+                            samplingCount
+                    );
+                    parseCounter++;
+                    if (targetChar !== null) {
+                        changeCount += lastChar !== targetChar ? 1 : 0;
+                        parsed.push(targetChar);
+                        lastChar = targetChar;
+                    } else if (targetCharNulls !== null) {
+                        console.log(cache);
+                        console.log(cacheNulls);
+                        nullsCount++;
+                        changeCount += lastChar !== targetCharNulls ? 1 : 0;
+                        parsed.push(targetCharNulls);
+                        lastChar = targetCharNulls;
+                    } else {
+                        console.log(cache);
+                        console.log(cacheNulls);
+                        nullsCount++;
+                    }
                     weight = 1;
                     firstChangeChar = null;
+                    this.clearMap(cache);
+                    this.clearMap(cacheNulls);
+                    samplingCount = 0;
                 }
-                this.clearMap(cache);
+
+                samplingCount++;
+            }
+
+            console.log(
+                'targetCharCount:' +
+                    targetCharCount +
+                    '/parsed.length :' +
+                    parsed.length +
+                    '/startUnixTime:' +
+                    startUnixTime +
+                    '/endUnixTime:' +
+                    endUnixTime +
+                    '/parseCounter:' +
+                    parseCounter +
+                    '/nullsCount:' +
+                    nullsCount
+            );
+            if (targetCharCount === parsed.length - 1 || targetCharCount === parsed.length) {
+                parsedCounts[k + '_'] = changeCount - (nullsCount * targetCharCount) / 20;
+                parsedMax[k + '_'] = parsed;
             }
         }
-        this.output(parsed);
+        const maxK = this.getMaxCountKey(parsedCounts);
+        console.log(parsedCounts);
+        const parsed = parsedMax[maxK];
         console.log(parsed);
+        try {
+            this.output(parsed);
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
         return parsed;
     }
     getMaxCountKey(countMap) {
