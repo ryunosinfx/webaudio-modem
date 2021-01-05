@@ -597,6 +597,7 @@ class Reciver {
             lastChar = char;
         }
         const targetCharCount = Math.floor((endUnixTime - startUnixTime) / spanDuration);
+        const isOdd = targetCharCount % 2;
         console.log(peakList);
         const parsedCounts = {};
         const parsedMax = {};
@@ -732,7 +733,11 @@ class Reciver {
                     '/nullsCount:' +
                     nullsCount
             );
-            if (targetCharCount === parsed.length - 1 || targetCharCount === parsed.length) {
+            if (
+                targetCharCount === parsed.length - nullsCount + 1 + isOdd ||
+                targetCharCount === parsed.length - nullsCount + 2 + isOdd ||
+                targetCharCount === parsed.length - nullsCount + 3 + isOdd
+            ) {
                 parsedCounts[k + '_'] = changeCount - (nullsCount * targetCharCount) / 20;
                 parsedMax[k + '_'] = parsed;
             }
