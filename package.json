@@ -1,0 +1,30 @@
+{
+  "name": "webaudio-modem",
+  "version": "1.0.0",
+  "description": "webaudio-modem",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryunosinfx/webaudio-modem.git"
+  },
+  "keywords": [
+    "webaudio",
+    "modem"
+  ],
+  "author": "ryunosinfx2 <ryunosinfxxul@gmail.com> (https://github.com/ryunosinfx)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ryunosinfx/webaudio-modem/issues"
+  },
+  "homepage": "https://github.com/ryunosinfx/webaudio-modem#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "webpack": "^5.11.1",
+    "webpack-cli": "^3.3.12",
+    "webpack-dev-server": "^3.11.1",
+    "webpack-server": "^0.1.2"
+  }
+}
