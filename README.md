@@ -21,7 +21,7 @@ it is build as es modules. When try using,You need a http server host.
 You can use Buffered version as a es module.
 
 
-```
+```atom/language-javascript
 import { Oscillator, Reciver } from './WebAudioModemBufferedCore.js';
 ////////////////////Oscillator////////////////////////////////
 /**
