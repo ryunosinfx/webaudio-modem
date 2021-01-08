@@ -62,16 +62,11 @@ export class B64Util {
     static s2hex(s) {
         const d = B64Util.to64(s);
         const hex = B64Util.b64toHex(d);
-        console.log(B64Util.hex2s(hex));
         return hex;
     }
     static hex2s(hex) {
         const u8a = B64Util.hex2u8a(hex);
-        console.log(u8a);
-        const bs = B64Util.u8a2bs(u8a);
-        console.log(bs);
         const d = B64Util.aToB64(u8a.buffer);
-        console.log(d);
         return B64Util.from64(d);
     }
     static b64uToAb(b) {
@@ -105,9 +100,7 @@ export class B64Util {
         return B64Util.toB64u(b);
     }
     static b64toHex(b64) {
-        console.log(b64);
         const u8a = B64Util.b64ToU8a(b64);
-        console.log(u8a);
         return B64Util.aToHex(u8a);
     }
     static aToHex(ai) {
