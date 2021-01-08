@@ -14,3 +14,5 @@ https://ryunosinfx.github.io/webaudio-modem/WebAudioModem.html
 8bit/1Code (Hamming code(7,4)+1ParityBit)
 
 https://ryunosinfx.github.io/webaudio-modem/WebAudioModemBuffered.html
+
+it is build as es modules. When try using,You need a http server host.

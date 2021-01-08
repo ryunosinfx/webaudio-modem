@@ -1,6 +1,6 @@
 {
   "name": "webaudio-modem",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "webaudio-modem",
   "main": "index.js",
   "scripts": {
