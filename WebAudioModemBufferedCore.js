@@ -60,7 +60,6 @@ export class Oscillator {
     convertTextToHaming(text) {
         const result = [];
         const hex = B64Util.s2hex(text);
-        console.log(hex);
         let idx = 0;
         for (const char of hex) {
             idx++;
@@ -75,7 +74,6 @@ export class Oscillator {
             const i = (b1 + b2 + b3 + b4 + c1 + c2 + c3) % 2;
             const p = i * 1 ? 0 : 1;
             const byte = '' + p + b1 + b2 + b3 + b4 + c1 + c2 + c3;
-            // console.log(byte + '/' + parseInt(byte, 2));
             result.push(parseInt(byte, 2));
         }
         return result;
@@ -84,9 +82,7 @@ export class Oscillator {
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
         const timeBetweenChars = (pause + duration) * 1;
-        // const chars = text.split('');
         const hamings = this.convertTextToHaming(text);
-        console.log(hamings);
         const textLen = hamings.length;
         await this.encodeCharcode(255, duration * 2);
         const start = Date.now();
@@ -99,8 +95,6 @@ export class Oscillator {
             if (pause) {
                 await ProcessUtil.sleep(pause * 1);
             }
-            // const char = hamings[i];
-            // const charCode = char.charCodeAt(0);
             await this.encodeCharcode(hamings[i], currentDuration);
             const now = Date.now();
             currentDuration = dd - (now - target);
@@ -152,11 +146,6 @@ export class Reciver {
         console.log(hex);
         const text = B64Util.hex2s(hex);
         this.onOutput(text);
-    }
-    trace(state) {
-        const str = state.toString(2);
-        const text = BaseSetting.pad.substring(0, BaseSetting.pad.length - str.length) + str;
-        this.onTrace(text + ' ' + state + ' ' + String.fromCharCode(state % 256));
     }
     stop() {
         this.isStop = true;
