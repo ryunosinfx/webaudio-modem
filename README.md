@@ -59,9 +59,9 @@ await oscillator.encode('hello world!', () => {
 /**
  * @constructor
  * @param {array} frequencies DTMFfrequencies as default.
- * @param {array} fftSize 4096=44100hz/4096=10.7hz/1byte as default.
- * @param {array} smoothingTimeConstant 0.0 (max speed sampling rate) as default.
- * @param {array} minDecibels -68 (db) as default.
+ * @param {number}} fftSize 4096=44100hz/4096=10.7hz/1byte as default.
+ * @param {number} smoothingTimeConstant 0.0 (max speed sampling rate) as default.
+ * @param {number} minDecibels -68 (db) as default.
  */
 const reciver = new Reciver();
 
