@@ -15,7 +15,11 @@ https://ryunosinfx.github.io/webaudio-modem/WebAudioModem.html
 
 https://ryunosinfx.github.io/webaudio-modem/WebAudioModemBuffered.html
 
-it is build as es modules. When try using,You need a http server host.
+It is build as es modules.
+
+When you try using Buffered version,You must prepare a http server and host this html files.
+
+It dose not work load from html files.
 
 ## Use as ES Modules
 You can use Buffered version as a es module.
