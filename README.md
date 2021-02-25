@@ -52,7 +52,7 @@ oscillator.pauseDuration=0;
 
 /**
  * encode text to sound as modem.
- * @param {string} text for encoding to sound.
+ * @param {string, Uint8Array} text for encoding to sound.
  * @param {function} onComplete a callback function at called end.
  */
 await oscillator.encode('hello world!', () => {
@@ -82,11 +82,17 @@ reciver.setBinVlueThreshold(200);
 reciver.setSpanDulation(40);
 
 /**
+ * The output data type. Default output type is string.
+ * @param {string} outputType text or Uint8Array.
+ */
+reciver.setOutputType("text" or "Uint8Array");
+
+/**
  * set callbak funk for reciver recived text.
  * if recived codes is invalid, return nothing and this callback method is not called.
  */
-reciver.onOutput=(text)=>{
-  alert(text);
+reciver.onOutput=(textOrUint8Array)=>{
+  alert(textOrUint8Array);
 }
 
 /**

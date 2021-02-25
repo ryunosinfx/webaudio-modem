@@ -64,6 +64,9 @@ export class B64Util {
         const hex = B64Util.b64toHex(d);
         return hex;
     }
+    static u8a2hex(u8a) {
+        return B64Util.aToHex(u8a);
+    }
     static hex2s(hex) {
         const u8a = B64Util.hex2u8a(hex);
         const d = B64Util.aToB64(u8a.buffer);
@@ -162,9 +165,5 @@ export class B64Util {
             b += '=';
         }
         return b;
-    }
-    static async sig(u8a) {
-        const bs = B64Util.u8a2bs(u8a);
-        return Hasher.sha256(bs, 1, 'hex');
     }
 }

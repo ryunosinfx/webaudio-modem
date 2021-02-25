@@ -57,9 +57,13 @@ export class Oscillator {
         }
         await ProcessUtil.sleep(duration);
     }
+    /**
+     *
+     * @param {string/Uint8Array} text
+     */
     convertTextToHaming(text) {
         const result = [];
-        const hex = B64Util.s2hex(text);
+        const hex = typeof text === 'string' ? B64Util.s2hex(text) : B64Util.u8a2hex(u8a);
         let idx = 0;
         for (const char of hex) {
             idx++;
@@ -133,6 +137,7 @@ export class Reciver {
         } catch (err) {
             alert('Microphone is required.');
         }
+        this.outputType = 'text';
         this.isStop = true;
     }
     setBinVlueThreshold(threshold) {
@@ -141,10 +146,13 @@ export class Reciver {
     setSpanDulation(spanDuration) {
         this.spanDuration = spanDuration * 1;
     }
+    setOutputType(outputType = 'text') {
+        this.outputType = outputType;
+    }
     output(chars) {
         const hex = chars.join('');
         console.log(hex);
-        const text = B64Util.hex2s(hex);
+        const text = this.outputType === 'text' ? B64Util.hex2s(hex) : B64Util.hex2u8a(hex);
         this.onOutput(text);
     }
     stop() {
