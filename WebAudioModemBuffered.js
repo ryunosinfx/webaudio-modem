@@ -3,13 +3,21 @@ import { Oscillator, Reciver } from './WebAudioModemBufferedCore.js';
 
 V.init();
 class Encoder {
-    constructor(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId) {
+    constructor(
+        encodBtnId,
+        clearBtnId,
+        encodeInputId,
+        pauseDurationId,
+        activeDurationId,
+        progressId
+    ) {
         this.Oscillator = new Oscillator();
         const encodBtnElm = V.gid(encodBtnId);
         const clearBtnElm = V.gid(clearBtnId);
         const encodeInputElm = V.gid(encodeInputId);
         const pauseDurationElm = V.gid(pauseDurationId);
         const activeDurationElm = V.gid(activeDurationId);
+        const progressElm = V.gid(progressId);
         V.ael(encodBtnElm, 'click', async () => {
             V.sa(encodBtnElm, 'disabled', 'disabled');
             await this.Oscillator.encode(encodeInputElm.value, () => {
@@ -28,6 +36,11 @@ class Encoder {
         V.ael(activeDurationElm, 'change', (e) => {
             this.Oscillator.activeDuration = e.target.value * 1;
         });
+
+        this.Oscillator.onProgress = (progress) => {
+            progressElm.style.width = progress * 100 + '%';
+        };
+        progressElm.style.width = 0 + '%';
     }
     stop() {}
     start() {
@@ -90,13 +103,21 @@ export class WebAudioModem {
     buildDecoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId) {
         this.decoder = new Decoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId);
     }
-    buildEncoder(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId) {
+    buildEncoder(
+        encodBtnId,
+        clearBtnId,
+        encodeInputId,
+        pauseDurationId,
+        activeDurationId,
+        progressId
+    ) {
         this.encoder = new Encoder(
             encodBtnId,
             clearBtnId,
             encodeInputId,
             pauseDurationId,
-            activeDurationId
+            activeDurationId,
+            progressId
         );
     }
     switchView(tabId) {
@@ -159,4 +180,12 @@ const encodeInputId = 'encode-input';
 const clearBtnId = 'encode-clear';
 const pauseDurationId = 'pause-duration';
 const activeDurationId = 'active-duration';
-wam.buildEncoder(encodBtnId, clearBtnId, encodeInputId, pauseDurationId, activeDurationId);
+const progressId = 'progress';
+wam.buildEncoder(
+    encodBtnId,
+    clearBtnId,
+    encodeInputId,
+    pauseDurationId,
+    activeDurationId,
+    progressId
+);

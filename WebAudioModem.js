@@ -62,7 +62,7 @@ class V {
 class BaseSetting {
     static frequenciesb = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
     static frequencies = [697, 770, 852, 941, 1209, 1336, 1477, 1633];
-    static audioContext = window.webkitAudioContext ? new webkitAudioContext() : new AudioContext();
+    // static audioContext = window.webkitAudioContext ? new webkitAudioContext() : new AudioContext();
     static getAudioContext() {
         return window.webkitAudioContext ? new webkitAudioContext() : new AudioContext();
         // return BaseSetting.audioContext;
@@ -79,6 +79,7 @@ class Oscillator {
         if (this.inited) {
             return;
         }
+        this.inited = true;
         this.audioContext = BaseSetting.getAudioContext();
         const masterGain = this.audioContext.createGain();
         masterGain.gain.value = 1.0 / this.frequencies.length;
@@ -174,19 +175,26 @@ class Reciver {
         minDecibels = -68
     ) {
         this.frequencies = frequencies;
+        this.inited = false;
+        this.fftSize = fftSize;
+        this.smoothingTimeConstant = smoothingTimeConstant;
+        this.minDecibels = minDecibels;
         // create audio nodes
+        this.history = [];
+    }
+    async init() {
+        if (this.inited) {
+            return;
+        }
+        this.inited = true;
         this.audioContext = BaseSetting.getAudioContext();
         const analyser = this.audioContext.createAnalyser();
-        analyser.fftSize = fftSize;
-        analyser.smoothingTimeConstant = smoothingTimeConstant;
-        analyser.minDecibels = minDecibels;
+        analyser.fftSize = this.fftSize;
+        analyser.smoothingTimeConstant = this.smoothingTimeConstant;
+        analyser.minDecibels = this.minDecibels;
         this.analyser = analyser;
         // buffer for analyser output
         this.buffer = new Uint8Array(analyser.frequencyBinCount);
-        this.history = [];
-        this.init();
-    }
-    async init() {
         // connect nodes
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -291,6 +299,7 @@ class Reciver {
         this.isStop = true;
     }
     start() {
+        this.init();
         this.decode();
     }
     async decode() {
@@ -388,21 +397,22 @@ class EncodeVisualiser {
         this.spectrumCtx = this.scElm.getContext('2d');
         this.waveformCtx = this.wcElm.getContext('2d');
         this.resizeTimeout = null;
+        this.inited = false;
         window.addEventListener('resize', (e) => {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(this.adjustCanvasWidth(), 100);
         });
-        // V.b.style.width = '100vw';
-        this.init();
-        this.HTMLPianKeyboard = new HTMLPianKeyboard(
-            this,
-            pianoId,
-            traceBinaryAreaId,
-            traceTextAreaId
-        );
-        setTimeout(this.adjustCanvasWidth(), 100);
+
+        window.addEventListener('click', (e) => {
+            // V.b.style.width = '100vw';
+            this.init();
+        });
     }
     init() {
+        if (this.inited) {
+            return;
+        }
+        this.inited = true;
         this.audioContext = BaseSetting.getAudioContext();
         const masterGain = this.audioContext.createGain();
         masterGain.gain.value = 1.0 / BaseSetting.frequencies.length;
@@ -419,6 +429,13 @@ class EncodeVisualiser {
         this.oscillators = {};
         this.animateCanvas();
         this.stop();
+        this.HTMLPianKeyboard = new HTMLPianKeyboard(
+            this,
+            pianoId,
+            traceBinaryAreaId,
+            traceTextAreaId
+        );
+        setTimeout(this.adjustCanvasWidth(), 100);
     }
     playFrequency(frequency) {
         if (frequency in this.oscillators || this.isStop) {
@@ -526,7 +543,9 @@ class EncodeVisualiser {
         this.isStop = true;
     }
     start() {
-        this.animateCanvas();
+        setTimeout(() => {
+            this.animateCanvas();
+        }, 1000);
     }
     animateCanvas() {
         this.isStop = false;
@@ -749,6 +768,20 @@ class Spectrogramer {
             clearTimeout(this.resizeTimeout);
             this.resizeTimeout = setTimeout(this.getOnResizeCanvasFunc(), 100);
         });
+        window.addEventListener('click', (e) => {
+            // V.b.style.width = '100vw';
+            this.init();
+        });
+        this.inited = false;
+        this.fftSize = 2048;
+        this.smoothingTimeConstant = 0.0;
+        // analyser.minDecibels = -58;
+    }
+    async init() {
+        if (this.inited) {
+            return;
+        }
+        this.inited = true;
         this.audioContext = BaseSetting.getAudioContext();
         const analyser = this.audioContext.createAnalyser();
         analyser.fftSize = 2048;
@@ -756,9 +789,6 @@ class Spectrogramer {
         // analyser.minDecibels = -58;
         this.analyser = analyser;
         this.buffer = new Uint8Array(analyser.frequencyBinCount);
-        this.init();
-    }
-    async init() {
         // connect nodes
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -788,7 +818,9 @@ class Spectrogramer {
         this.isStop = false;
     }
     start() {
-        this.animate();
+        setTimeout(() => {
+            this.animate();
+        }, 1000);
     }
     animate() {
         this.isStop = false;

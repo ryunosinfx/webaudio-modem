@@ -49,6 +49,13 @@ oscillator.activeDuration=40;
  */
 oscillator.pauseDuration=0;
 
+/**
+ * The oscillator call by active times and input oscilating progress 0-1.
+ */
+oscillator.onProgress=(progress)=>{
+  console.log(progress)
+};
+
 
 /**
  * encode text to sound as modem.

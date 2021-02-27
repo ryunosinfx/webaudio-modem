@@ -11,13 +11,16 @@ class BaseSetting {
     static pad = '0b00000000';
 }
 export class Oscillator {
-    constructor(frequencies = BaseSetting.frequencies) {
+    constructor(frequencies = BaseSetting.frequencies, alertMsg = 'click widow somewehere!.') {
         this.frequencies = frequencies;
         this.frequenciesLen = frequencies.length;
         this.inited = false;
+        this.alertMsg = alertMsg;
         window.addEventListener('click', (e) => {
             this.init();
         });
+        this.progress = 0;
+        this.onProgress = (progress) => {};
     }
     async init() {
         if (this.inited) {
@@ -51,6 +54,10 @@ export class Oscillator {
         }
     }
     async encodeCharcode(charCode, duration) {
+        if (!this.oscillators) {
+            alert(this.alertMsg);
+            return;
+        }
         for (let i = 0; i < this.frequenciesLen; i++) {
             const osc = this.oscillators[i];
             osc.gain.value = charCode & (1 << i) ? 1 : 0;
@@ -83,29 +90,49 @@ export class Oscillator {
         return result;
     }
     async encode(text, onComplete) {
+        this.init();
+        return await this.encodeExec(text, onComplete);
+    }
+    async encodeExec(text, onComplete) {
+        this.progress = 0;
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
         const timeBetweenChars = (pause + duration) * 1;
         const hamings = this.convertTextToHaming(text);
-        const textLen = hamings.length;
+        const hamingsLen = hamings.length;
         await this.encodeCharcode(255, duration * 2);
         const start = Date.now();
         let currentDuration = timeBetweenChars;
         const dd = timeBetweenChars * 2;
         const offset = start % timeBetweenChars;
         const times = Math.floor(start / timeBetweenChars);
-        for (let i = 0; i < textLen; i++) {
+        for (let i = 0; i < hamingsLen; i++) {
             const target = (times + i) * timeBetweenChars + offset;
             if (pause) {
                 await ProcessUtil.sleep(pause * 1);
             }
             await this.encodeCharcode(hamings[i], currentDuration);
+            this.progress = (i + 1) / hamingsLen;
+            this.onProgressExec();
             const now = Date.now();
             currentDuration = dd - (now - target);
         }
         this.mute();
-        await ProcessUtil.sleep(timeBetweenChars * textLen);
+        await ProcessUtil.sleep(timeBetweenChars * hamingsLen);
+
+        this.progress = 1;
         onComplete();
+    }
+    onProgressExec() {
+        setTimeout(() => {
+            this.onProgress(this.progress);
+        });
+    }
+    getProgress() {
+        return this.progress;
+    }
+    end() {
+        this.progress = 0;
     }
 }
 export class Reciver {
@@ -113,25 +140,38 @@ export class Reciver {
         frequencies = BaseSetting.frequencies,
         fftSize = 4096,
         smoothingTimeConstant = 0.0,
-        minDecibels = -68
+        minDecibels = -68,
+        alertMsg = 'click widow somewehere!.'
     ) {
         this.frequencies = frequencies;
         // create audio nodes
-        this.audioContext = BaseSetting.getAudioContext();
-        const analyser = this.audioContext.createAnalyser();
-        analyser.fftSize = fftSize;
-        analyser.smoothingTimeConstant = smoothingTimeConstant;
-        analyser.minDecibels = minDecibels;
-        this.analyser = analyser;
+        this.fftSize = fftSize;
+        this.smoothingTimeConstant = smoothingTimeConstant;
+        this.minDecibels = minDecibels;
         // buffer for analyser output
         this.history = [];
-        this.init();
+        this.inited = false;
+        this.alertMsg = alertMsg;
+        window.addEventListener('click', (e) => {
+            this.init();
+        });
     }
     async init() {
+        if (this.inited) {
+            return;
+        }
+        this.inited = true;
         // connect nodes
+        this.audioContext = BaseSetting.getAudioContext();
+        const analyser = this.audioContext.createAnalyser();
+        analyser.fftSize = this.fftSize;
+        analyser.smoothingTimeConstant = this.smoothingTimeConstant;
+        analyser.minDecibels = this.minDecibels;
+        this.analyser = analyser;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const microphone = this.audioContext.createMediaStreamSource(stream);
+            console.log(this.analyser);
             microphone.connect(this.analyser);
             this.decode();
         } catch (err) {
@@ -550,6 +590,7 @@ export class Reciver {
                     ? 0
                     : 128;
             selected.push(selectedSate);
+            // console.log(buffer);
             // console.log('state.isRecording:' + state.isRecording);
             // console.log('state.isRecording:' + state.isRecording + '/selectedSate:' + selectedSate);
             if (state.isRecording) {
