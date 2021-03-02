@@ -70,7 +70,7 @@ export class Oscillator {
      */
     convertTextToHaming(text) {
         const result = [];
-        const hex = typeof text === 'string' ? B64Util.s2hex(text) : B64Util.u8a2hex(u8a);
+        const hex = typeof text === 'string' ? B64Util.s2hex(text) : B64Util.u8a2hex(text);
         let idx = 0;
         for (const char of hex) {
             idx++;
