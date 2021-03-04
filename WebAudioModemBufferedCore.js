@@ -91,14 +91,14 @@ export class Oscillator {
     }
     async encode(text, onComplete, onCompleteMute, hasMuteTimeOnEnd) {
         this.init();
-        return await this.encodeExec(
-            text,
-            (onComplete = () => {}),
-            (onCompleteMute = () => {}),
-            (hasMuteTimeOnEnd = true)
-        );
+        return await this.encodeExec(text, onComplete, onCompleteMute, hasMuteTimeOnEnd);
     }
-    async encodeExec(text, onComplete, onCompleteMute, hasMuteTimeOnEnd) {
+    async encodeExec(
+        text,
+        onComplete = () => {},
+        onCompleteMute = () => {},
+        hasMuteTimeOnEnd = true
+    ) {
         this.progress = 0;
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
