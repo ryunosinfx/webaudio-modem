@@ -98,7 +98,7 @@ export class Oscillator {
             (hasMuteTimeOnEnd = true)
         );
     }
-    async encodeExec(text, onComplete, onCompleteMute) {
+    async encodeExec(text, onComplete, onCompleteMute, hasMuteTimeOnEnd) {
         this.progress = 0;
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
