@@ -60,11 +60,15 @@ oscillator.onProgress=(progress)=>{
 /**
  * encode text to sound as modem.
  * @param {string, Uint8Array} text for encoding to sound.
- * @param {function} onComplete a callback function at called end.
+ * @param {function} onComplete a callback function at called end. is nullable;
+ * @param {function} onCompleteMute a callback function at called end of oscilations. is nullable;
+ * @param {boolean} hasMuteTimeOnEnd has wait time as saame as oscilating duration after end of oscilations. default true;
  */
 await oscillator.encode('hello world!', () => {
     alert('encoding is end!');
-});
+}, () => {
+    alert('encoding is oscilating end!');
+}),true);
 
 ////////////////////Reciver////////////////////////////////
 /**

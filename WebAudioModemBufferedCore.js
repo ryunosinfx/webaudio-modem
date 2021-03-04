@@ -89,11 +89,16 @@ export class Oscillator {
         }
         return result;
     }
-    async encode(text, onComplete) {
+    async encode(text, onComplete, onCompleteMute, hasMuteTimeOnEnd) {
         this.init();
-        return await this.encodeExec(text, onComplete);
+        return await this.encodeExec(
+            text,
+            (onComplete = () => {}),
+            (onCompleteMute = () => {}),
+            (hasMuteTimeOnEnd = true)
+        );
     }
-    async encodeExec(text, onComplete) {
+    async encodeExec(text, onComplete, onCompleteMute) {
         this.progress = 0;
         const pause = this.pauseDuration;
         const duration = this.activeDuration;
@@ -117,8 +122,11 @@ export class Oscillator {
             const now = Date.now();
             currentDuration = dd - (now - target);
         }
+        onCompleteMute();
         this.mute();
-        await ProcessUtil.sleep(timeBetweenChars * hamingsLen);
+        if (hasMuteTimeOnEnd) {
+            await ProcessUtil.sleep(timeBetweenChars * hamingsLen);
+        }
 
         this.progress = 1;
         onComplete();
