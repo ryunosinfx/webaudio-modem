@@ -107,6 +107,13 @@ reciver.onOutput=(textOrUint8Array)=>{
 }
 
 /**
+ * set callbak funk for reciver state changed.
+ * if recived state is changed, return new state(Reciver.state.STOP->(on start)Reciver.state.WAITING->Reciver.state.RECORDING->Reciver.state.PARSING->(on stop)Reciver.state.STOP)
+ */
+reciver.onStateChane=(newState)=>{
+  alert(newState);
+}
+/**
  * start waiting for oscillator sounding codes.
  */
 reciver.start();

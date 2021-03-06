@@ -30,7 +30,7 @@
 
                 <h2>config</h2>
                 <label for="active-duration">Bit high duration: <span data-val></span> ms</label>
-                <input id="active-duration" type="range" value="30" min="10" , max="1000" , step="10">
+                <input id="active-duration" type="range" value="40" min="10" , max="1000" , step="10">
 
                 <label for="pause-duration">Pause between bytes: <span data-val></span> ms</label>
                 <input id="pause-duration" type="range" value="0" min="0" , max="500" , step="10">
@@ -41,13 +41,16 @@
                 <textarea readonly id="decoder-output"></textarea>
                 <p>
                     <button id="decode-clear">clear</button>
+                    <span class="state">
+                        <span id="reciever-sate"></span>
+                    </span>
                 </p>
 
                 <h2>config</h2>
                 <label for="bin-value-threshold">Significant bin byte value threshold: <span data-val></span></label>
-                <input id="bin-value-threshold" type="range" value="124" min="1" , max="255" , step="1">
+                <input id="bin-value-threshold" type="range" value="200" min="1" , max="255" , step="1">
                 <label for="span-duration">Bit high span duration: <span data-val></span> ms</label>
-                <input id="span-duration" type="range" value="30" min="10" , max="1000" , step="10">
+                <input id="span-duration" type="range" value="40" min="10" , max="1000" , step="10">
             </div>
         </div>
     </div>

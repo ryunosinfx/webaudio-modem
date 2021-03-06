@@ -18,15 +18,23 @@ class Encoder {
         const pauseDurationElm = V.gid(pauseDurationId);
         const activeDurationElm = V.gid(activeDurationId);
         const progressElm = V.gid(progressId);
+        const profressFunc = (progress) => {
+            progressElm.style.width = progress * 100 + '%';
+        };
         V.ael(encodBtnElm, 'click', async () => {
             V.sa(encodBtnElm, 'disabled', 'disabled');
             await this.Oscillator.encode(encodeInputElm.value, () => {
                 encodBtnElm.removeAttribute('disabled');
             });
+            setTimeout(() => {
+                encodBtnElm.blur();
+                profressFunc(0);
+            }, 10000);
         });
         V.ael(clearBtnElm, 'click', () => {
             encodeInputElm.value = '';
             clearBtnElm.blur();
+            profressFunc(0);
         });
         this.Oscillator.pauseDuration = pauseDurationElm.value * 1;
         V.ael(pauseDurationElm, 'change', (e) => {
@@ -37,9 +45,7 @@ class Encoder {
             this.Oscillator.activeDuration = e.target.value * 1;
         });
 
-        this.Oscillator.onProgress = (progress) => {
-            progressElm.style.width = progress * 100 + '%';
-        };
+        this.Oscillator.onProgress = profressFunc;
         progressElm.style.width = 0 + '%';
     }
     stop() {}
@@ -53,7 +59,8 @@ class Decoder {
         spanDulationId = 'span-dulation',
         outputId = 'output',
         clearId = 'clearBtn',
-        codeId = 'code'
+        codeId = 'code',
+        recieverSateId = 'reciever-sate'
     ) {
         this.reciver = new Reciver();
         this.binVlueThresholdElm = V.gid(binVlueThresholdId);
@@ -61,10 +68,12 @@ class Decoder {
         this.outputElm = V.gid(outputId);
         this.clearbtnElm = V.gid(clearId);
         this.codeElm = V.gid(codeId);
+        this.recieverSateElm = V.gid(recieverSateId);
         V.ael(this.clearbtnElm, 'click', (e) => {
             this.outputElm.value = '';
             e.target.blur();
         });
+        this.reciver.stop();
         V.ael(this.binVlueThresholdElm, 'change', (e) => {
             this.reciver.setBinVlueThreshold(e.target.value);
         });
@@ -80,12 +89,16 @@ class Decoder {
         this.reciver.onTrace = (text) => {
             this.codeElm.textContent = text;
         };
-        this.reciver.stop();
+        this.reciver.onStateChange = (state) => {
+            this.recieverSateElm.textContent = state;
+        };
     }
     stop() {
+        console.log('stop');
         this.reciver.stop();
     }
     start() {
+        console.log('start');
         this.reciver.start();
     }
 }

@@ -191,6 +191,9 @@ div.spectrogram canvas {
     height: 100vw;
 }
 
+span.state {
+    display: inline-block;
+}
 div.progress {
     height: 1em;
     background: #555;

@@ -144,6 +144,13 @@ export class Oscillator {
     }
 }
 export class Reciver {
+    static state = {
+        STOP: 'stop',
+        WAITING: 'waiting',
+        RECORDING: 'recording',
+        PARSING: 'parsing',
+        FAIL: 'fail',
+    };
     constructor(
         frequencies = BaseSetting.frequencies,
         fftSize = 4096,
@@ -160,6 +167,7 @@ export class Reciver {
         this.history = [];
         this.inited = false;
         this.alertMsg = alertMsg;
+        this.onStateChange = () => {};
         window.addEventListener('click', (e) => {
             this.init();
         });
@@ -186,7 +194,7 @@ export class Reciver {
             alert('Microphone is required.');
         }
         this.outputType = 'text';
-        this.isStop = true;
+        // this.isStop = true;
     }
     setBinVlueThreshold(threshold) {
         this.binVlueThreshold = threshold * 1;
@@ -198,13 +206,23 @@ export class Reciver {
         this.outputType = outputType;
     }
     output(chars) {
+        console.log(chars);
+        if (!chars) {
+            this.onOutput('');
+            return;
+        }
         const hex = chars.join('');
-        console.log(hex);
+        if (!hex) {
+            this.onOutput('');
+            return;
+        }
+        // console.log(hex);
         const text = this.outputType === 'text' ? B64Util.hex2s(hex) : B64Util.hex2u8a(hex);
         this.onOutput(text);
     }
     stop() {
         this.isStop = true;
+        this.onStateChange(Reciver.state.STOP);
     }
     start() {
         this.decode();
@@ -266,6 +284,15 @@ export class Reciver {
         return { i, hex, isFailed, bit, p, codn };
     }
     parse(bufferedData, indexCount, targetIndexCount) {
+        return new Promise((resolve) => {
+            console.log('parse A');
+            console.time('parse');
+            const result = this.parseExec(bufferedData, indexCount, targetIndexCount);
+            console.timeEnd('parse');
+            resolve(result);
+        });
+    }
+    parseExec(bufferedData, indexCount, targetIndexCount) {
         console.log(
             'parse bufferedData.length:' +
                 bufferedData.length +
@@ -288,6 +315,7 @@ export class Reciver {
         const firstRow = bufferedData[0];
         const firstTime = firstRow[firstRow.length - 2];
         let lastState = 0;
+        // console.log('parseExec A');
         for (const row of bufferedData) {
             const state = row.pop();
             const time = row.pop();
@@ -308,11 +336,12 @@ export class Reciver {
                 mins[index] = min > target ? target : min;
                 data.push({ target, pValue, lastValue });
             }
-            // console.log('data.length:' + data.length + '/indexCount:' + indexCount);
+            // console.log('parseExec A data.length:' + data.length + '/indexCount:' + indexCount);
             const calced = { state, time, data, lastState };
             peakList.push(calced);
             lastState = state;
         }
+        // console.log('parseExec B');
         const thresholds = [];
         for (let i = 0; i < targetIndexCount; i++) {
             const max = maxes[i];
@@ -322,8 +351,9 @@ export class Reciver {
         console.log(maxes);
         console.log(thresholds);
         if (bufferedData.length < 1) {
-            return;
+            return false;
         }
+        // console.log('parseExec C');
         const spanDuration = this.spanDuration * 1;
         const offset = Math.ceil(spanDuration * 1.1);
         console.log(
@@ -335,6 +365,7 @@ export class Reciver {
         let lastChar = null;
         let startUnixTime = Date.now();
         let endUnixTime = 0;
+        // console.log('parseExec D');
         for (const calced of peakList) {
             const data = calced.data;
             const time = calced.time;
@@ -372,15 +403,16 @@ export class Reciver {
             }
             lastChar = char;
         }
+        // console.log('parseExec E');
         const targetCharCount = Math.floor((endUnixTime - startUnixTime) / spanDuration);
         const isOdd = targetCharCount % 2;
-        console.log(peakList);
+        // console.log(peakList);
         const parsedCounts = {};
         const parsedMax = {};
         const cache = {};
         const cacheNulls = {};
         for (let k = 0; k < 5; k++) {
-            console.log('k:' + k);
+            // console.log('k:' + k);
             const parsed = [];
             let parseCounter = 1;
             let weight = '';
@@ -518,6 +550,7 @@ export class Reciver {
                 parsedMax[k + '_'] = parsed;
             }
         }
+        // console.log('parseExec F');
         const maxK = this.getMaxCountKey(parsedCounts);
         console.log(parsedCounts);
         const parsed = parsedMax[maxK];
@@ -560,6 +593,8 @@ export class Reciver {
         return byte;
     }
     async decode() {
+        this.init();
+        this.onStateChange(Reciver.state.WAITING);
         const buffer = new Uint8Array(this.analyser.frequencyBinCount);
         this.isStop = false;
         const thesholdMs = 15;
@@ -605,7 +640,16 @@ export class Reciver {
                 state.lastEnd = selectedSate ? start : state.lastEnd;
                 if (start - state.lastEnd > thesholdMsEnd) {
                     state.isRecording = false;
-                    this.parse(bufferedData, indexCount, targetIndexCount);
+                    this.onStateChange(Reciver.state.PARSING);
+                    const result = await this.parse(bufferedData, indexCount, targetIndexCount);
+                    if (result) {
+                        this.onStateChange(Reciver.state.WAITING);
+                    } else {
+                        this.onStateChange(Reciver.state.FAIL);
+                        setTimeout(() => {
+                            this.onStateChange(Reciver.state.WAITING);
+                        }, 3000);
+                    }
                     bufferedData.splice(0, bufferedData.length);
                 } else {
                     bufferedData.push(selected);
@@ -618,6 +662,7 @@ export class Reciver {
                             : state.lastOn
                         : start + futurOffset;
                 if (start - state.lastOn >= thesholdMs) {
+                    this.onStateChange(Reciver.state.RECORDING);
                     state.isRecording = true;
                     state.lastOn = start + futurOffset;
                 }
