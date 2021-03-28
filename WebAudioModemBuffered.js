@@ -60,7 +60,8 @@ class Decoder {
         outputId = 'output',
         clearId = 'clearBtn',
         codeId = 'code',
-        recieverSateId = 'reciever-sate'
+        recieverSateId = 'reciever-sate',
+        unsherpMaskGainId = 'unsherp-mask-gain'
     ) {
         this.reciver = new Reciver();
         this.binVlueThresholdElm = V.gid(binVlueThresholdId);
@@ -69,6 +70,7 @@ class Decoder {
         this.clearbtnElm = V.gid(clearId);
         this.codeElm = V.gid(codeId);
         this.recieverSateElm = V.gid(recieverSateId);
+        this.unsherpMaskGainElm = V.gid(unsherpMaskGainId);
         V.ael(this.clearbtnElm, 'click', (e) => {
             this.outputElm.value = '';
             e.target.blur();
@@ -82,6 +84,10 @@ class Decoder {
             this.reciver.setSpanDulation(e.target.value);
         });
         this.reciver.spanDuration = this.spanDulationElm.value * 1;
+        V.ael(this.unsherpMaskGainElm, 'change', (e) => {
+            this.reciver.setUnsherpMaskGain(e.target.value);
+        });
+        this.reciver.unsherpMaskGain = this.unsherpMaskGainElm.value * 1;
         this.reciver.onOutput = (input) => {
             // console.log(this.outputElm.value + input);
             this.outputElm.value += input;
@@ -113,8 +119,24 @@ export class WebAudioModem {
             return this.decoder;
         };
     }
-    buildDecoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId) {
-        this.decoder = new Decoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId);
+    buildDecoder(
+        binVlueThresholdId,
+        spanDurationId,
+        outputId,
+        clearId,
+        codeId,
+        recieverSateId,
+        unsherpMaskGainId
+    ) {
+        this.decoder = new Decoder(
+            binVlueThresholdId,
+            spanDurationId,
+            outputId,
+            clearId,
+            codeId,
+            recieverSateId,
+            unsherpMaskGainId
+        );
     }
     buildEncoder(
         encodBtnId,
@@ -184,10 +206,20 @@ const wam = new WebAudioModem(tabIds);
 new WebAudioModemView(tabIds, wam);
 const binVlueThresholdId = 'bin-value-threshold';
 const spanDurationId = 'span-duration';
+const unsherpMaskGainId = 'unsherp-mask-gain';
+const recieverSateId = 'reciever-sate';
 const outputId = 'decoder-output';
 const clearId = 'decode-clear';
 const codeId = 'decode-code';
-wam.buildDecoder(binVlueThresholdId, spanDurationId, outputId, clearId, codeId);
+wam.buildDecoder(
+    binVlueThresholdId,
+    spanDurationId,
+    outputId,
+    clearId,
+    codeId,
+    recieverSateId,
+    unsherpMaskGainId
+);
 const encodBtnId = 'encode-action';
 const encodeInputId = 'encode-input';
 const clearBtnId = 'encode-clear';

@@ -1,5 +1,8 @@
 import { B64Util } from './util/B64Util.js';
 import { ProcessUtil } from './util/ProcessUtil.js';
+
+const subCount = 7;
+const harf = Math.floor(subCount / 2);
 class BaseSetting {
     static frequenciesb = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
     static frequencies = [697, 770, 852, 941, 1209, 1336, 1477, 1633];
@@ -71,6 +74,7 @@ export class Oscillator {
     convertTextToHaming(text) {
         const result = [];
         const hex = typeof text === 'string' ? B64Util.s2hex(text) : B64Util.u8a2hex(text);
+        console.log('hex:' + hex + '/' + hex.length);
         let idx = 0;
         for (const char of hex) {
             idx++;
@@ -167,6 +171,7 @@ export class Reciver {
         this.history = [];
         this.inited = false;
         this.alertMsg = alertMsg;
+        this.unsherpMaskGain = 1;
         this.onStateChange = () => {};
         window.addEventListener('click', (e) => {
             this.init();
@@ -194,7 +199,7 @@ export class Reciver {
             alert('Microphone is required.');
         }
         this.outputType = 'text';
-        // this.isStop = true;
+        this.isStop = true;
     }
     setBinVlueThreshold(threshold) {
         this.binVlueThreshold = threshold * 1;
@@ -202,11 +207,14 @@ export class Reciver {
     setSpanDulation(spanDuration) {
         this.spanDuration = spanDuration * 1;
     }
+    setUnsherpMaskGain(unsherpMaskGain) {
+        this.unsherpMaskGain = unsherpMaskGain * 1;
+    }
     setOutputType(outputType = 'text') {
         this.outputType = outputType;
     }
     output(chars) {
-        console.log(chars);
+        // console.log(chars);
         if (!chars) {
             this.onOutput('');
             return;
@@ -216,7 +224,7 @@ export class Reciver {
             this.onOutput('');
             return;
         }
-        // console.log(hex);
+        // console.log('output hex');
         const text = this.outputType === 'text' ? B64Util.hex2s(hex) : B64Util.hex2u8a(hex);
         this.onOutput(text);
     }
@@ -225,7 +233,14 @@ export class Reciver {
         this.onStateChange(Reciver.state.STOP);
     }
     start() {
-        this.decode();
+        this.init();
+        if (this.isStop) {
+            this.isStop = false;
+            setTimeout(() => {
+                console.log('start decoder');
+                this.decode();
+            }, 1000);
+        }
     }
     calcTargetIndexes() {
         const targetIndexes = [];
@@ -283,89 +298,213 @@ export class Reciver {
         hex = parseInt(bit, 2).toString(16);
         return { i, hex, isFailed, bit, p, codn };
     }
-    parse(bufferedData, indexCount, targetIndexCount) {
+    parse(bufferedData, indexCount, targetIndexCount, unsherpMaskGain = 1) {
         return new Promise((resolve) => {
             console.log('parse A');
             console.time('parse');
-            const result = this.parseExec(bufferedData, indexCount, targetIndexCount);
+
+            const result = this.parseExec(
+                bufferedData,
+                indexCount,
+                targetIndexCount,
+                unsherpMaskGain
+            );
             console.timeEnd('parse');
             resolve(result);
         });
     }
-    parseExec(bufferedData, indexCount, targetIndexCount) {
-        console.log(
-            'parse bufferedData.length:' +
-                bufferedData.length +
-                '/indexCount:' +
-                indexCount +
-                '/targetIndexCount:' +
-                targetIndexCount
-        );
-        const peakList = [];
-        const maxes = new Uint8Array(targetIndexCount);
-        maxes.fill(0);
-        const mins = new Uint8Array(targetIndexCount);
-        mins.fill(255);
-        const dBuffers = new Array(targetIndexCount);
-        dBuffers.fill(0);
-        const lastBuffers = new Array(targetIndexCount);
-        lastBuffers.fill(0);
-        const lastDBuffers = new Array(targetIndexCount);
-        lastDBuffers.fill(0);
-        const firstRow = bufferedData[0];
-        const firstTime = firstRow[firstRow.length - 2];
-        let lastState = 0;
-        // console.log('parseExec A');
-        for (const row of bufferedData) {
-            const state = row.pop();
-            const time = row.pop();
-            const data = [];
-            for (let i = 0; i < indexCount; i++) {
-                const index = i; //Math.floor(i / 5);
-                const target = row[i];
-                const max = maxes[index];
-                const lastValue = lastBuffers[index];
-                const dValue = target - lastValue;
-                const lastDValue = lastDBuffers[index];
-                const pValue = dValue * (lastDValue === 0 ? 1 : lastDValue);
-                lastDBuffers[index] = dBuffers[index];
-                dBuffers[index] = dValue;
-                lastBuffers[index] = target;
-                maxes[index] = target > max ? target : max;
-                const min = mins[index];
-                mins[index] = min > target ? target : min;
-                data.push({ target, pValue, lastValue });
-            }
-            // console.log('parseExec A data.length:' + data.length + '/indexCount:' + indexCount);
-            const calced = { state, time, data, lastState };
-            peakList.push(calced);
-            lastState = state;
-        }
-        // console.log('parseExec B');
-        const thresholds = [];
-        for (let i = 0; i < targetIndexCount; i++) {
-            const max = maxes[i];
-            const threshold = max * 0.9;
-            thresholds.push(threshold);
-        }
-        console.log(maxes);
-        console.log(thresholds);
-        if (bufferedData.length < 1) {
-            return false;
-        }
-        // console.log('parseExec C');
-        const spanDuration = this.spanDuration * 1;
-        const offset = Math.ceil(spanDuration * 1.1);
-        console.log(
-            'offset:' + offset + '/spanDuration:' + spanDuration
-            //+ '/firstPeakTime:' + firstPeakTime
-        );
-        const startTime = firstTime + offset;
+    parsecharContinuous(part, thresholds, targetIndexCount) {
         const charContinuous = [];
         let lastChar = null;
         let startUnixTime = Date.now();
         let endUnixTime = 0;
-        // console.log('parseExec D');
+        for (const calced of part) {
+            const data = calced.data;
+            const time = calced.time;
+            const byte = this.readByte(data, thresholds, targetIndexCount);
+            const hamingResult = this.valitadeHaming(byte);
+            const char = hamingResult.hex;
+            calced.hamingResult = hamingResult;
+            calced.byte = byte;
+            const state = calced.state;
+            const lastState = calced.lastState;
+            const isReadable = state > 0 || lastState > 0;
+            if (!isReadable) {
+                continue;
+            }
+            if (!hamingResult.isFailed) {
+                startUnixTime = time > startUnixTime ? startUnixTime : time;
+                endUnixTime = time > endUnixTime ? time : endUnixTime;
+            }
+            if (char === lastChar) {
+                charContinuous.push(hamingResult);
+            } else {
+                for (const hamingResult of charContinuous) {
+                    if (!hamingResult.isFailed) {
+                        for (const hamingResult of charContinuous) {
+                            hamingResult.isFailed = 0;
+                        }
+                        break;
+                    }
+                }
+                charContinuous.splice(0, charContinuous.length);
+            }
+            lastChar = char;
+        }
+    }
+    pursePerPart(part, parsed, lastChar, spanDuration, spanOffset, thresholds, targetIndexCount) {
+        // let changeCount = 0;
+        const cache = {};
+        const cacheNulls = {};
+        let nullsCount = 0;
+        const nextPeakTime = part.nextPeakTime;
+        for (const calced of part) {
+            const state = calced.state;
+            const lastState = calced.lastState;
+            const time = calced.time;
+            const diff = nextPeakTime - time - spanOffset;
+            const hamingResult = calced.hamingResult;
+            const char = hamingResult.hex;
+            const isReadable = state > 0 || lastState > 0;
+            const weight = spanDuration + 20 * (isReadable ? 2 : 1) - Math.abs(diff);
+            const firstChangeChar = char !== lastChar ? char : null;
+            const currentWeight =
+                char !== lastChar ? (firstChangeChar === char ? weight * 2 : weight * 1) : weight;
+            if (!hamingResult.isFailed) {
+                cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
+            } else {
+                cacheNulls[char] = cacheNulls[char]
+                    ? cacheNulls[char] + currentWeight
+                    : currentWeight;
+            }
+        }
+        // console.log(cache);
+        const targetChar = this.getMaxCountKey(cache);
+        const targetCharNulls = this.getMaxCountKey(cacheNulls);
+        // console.log(
+        //     'targetChar:' +
+        //         targetChar +
+        //         '/targetCharNulls:' +
+        //         targetCharNulls +
+        //         '/weight:' +
+        //         weight +
+        //         '/spanDuration:' +
+        //         spanDuration +
+        //         '/diff:' +
+        //         diff +
+        //         '/spanOffset:' +
+        //         spanOffset +
+        //         '/time:' +
+        //         time +
+        //         '/nextPeakTime:' +
+        //         nextPeakTime
+        // );
+        if (targetChar !== null) {
+            // changeCount += lastChar !== targetChar ? 1 : 0;
+            // const startTime = firstTime + offset;
+            this.parsecharContinuous(part, thresholds, targetIndexCount);
+            parsed.push(targetChar);
+            lastChar = targetChar;
+        } else if (targetCharNulls !== null) {
+            // console.log(cache);
+            // console.log(cacheNulls);
+            nullsCount++;
+            // changeCount += lastChar !== targetCharNulls ? 1 : 0;
+            parsed.push(targetCharNulls);
+            lastChar = targetCharNulls;
+        } else {
+            // console.log(cache);
+            // console.log(cacheNulls);
+            nullsCount++;
+        }
+        this.clearMap(cache);
+        this.clearMap(cacheNulls);
+        part.lastChar = lastChar;
+        part.nullsCount = nullsCount;
+        return { lastChar, nullsCount };
+    }
+    parseParUnitTime(
+        peakList,
+        k,
+        spanDuration,
+        targetCharCount,
+        startTimeInput,
+        thresholds,
+        targetIndexCount
+    ) {
+        const parsed = [];
+        let parseCounter = 1;
+        let changeCount = 0;
+        let nullsCount = 0;
+        const spanOffset = Math.ceil(spanDuration / 2) + Math.floor((spanDuration * k) / 10);
+        const startTime = startTimeInput - Math.ceil(spanDuration / 2);
+        console.log(
+            'parseParUnitTime k:' +
+                k +
+                '/spanDuration:' +
+                spanDuration +
+                '/spanOffset:' +
+                spanOffset
+        );
+        const parts = {};
+        for (const calced of peakList) {
+            const part = parts[parseCounter] ? parts[parseCounter] : [];
+            parts[parseCounter] = part;
+            part.push(calced);
+            const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
+            part.nextPeakTime = nextPeakTime;
+            const time = calced.time;
+            if (nextPeakTime <= time) {
+                parseCounter++;
+            }
+        }
+        console.log(parts);
+        let lastChar = null;
+        for (const parseCounter in parts) {
+            const part = parts[parseCounter];
+            const result = this.pursePerPart(
+                part,
+                parsed,
+                lastChar,
+                spanDuration,
+                spanOffset,
+                thresholds,
+                targetIndexCount
+            );
+            changeCount += lastChar === result.lastChar ? 0 : 1;
+            lastChar = result.lastChar;
+            nullsCount += result.nullsCount;
+        }
+        const isOdd = targetCharCount % 2;
+        console.log(
+            'parseParUnitTime parsed targetCharCount:' +
+                targetCharCount +
+                '/nullsCount:' +
+                nullsCount +
+                '/changeCount:' +
+                changeCount +
+                '/parsed.length:' +
+                parsed.length
+        );
+        if (
+            targetCharCount === parsed.length - nullsCount - 1 + isOdd ||
+            targetCharCount === parsed.length - nullsCount + 0 + isOdd ||
+            targetCharCount === parsed.length - nullsCount + 1 + isOdd
+        ) {
+            console.log(parsed?.join(''));
+            return {
+                parsedCounts: changeCount - (nullsCount * targetCharCount) / 20,
+                parsed: parsed.slice(0, targetCharCount),
+            };
+        }
+        return null;
+    }
+    preDecode(peakList, thresholds, targetIndexCount) {
+        const charContinuous = [];
+        let lastChar = null;
+        let startUnixTime = Date.now();
+        let endUnixTime = 0;
+        console.log('parseExec D');
         for (const calced of peakList) {
             const data = calced.data;
             const time = calced.time;
@@ -403,158 +542,158 @@ export class Reciver {
             }
             lastChar = char;
         }
+        return { startUnixTime, endUnixTime };
+    }
+    unsharpFilter(list, indexCount, k = 1) {
+        const len = list.length;
+        const width = indexCount * subCount;
+        for (let i = 0; i < len; i++) {
+            const row = list[i];
+            for (let j = 0; j < width; j++) {
+                const kernel = this.getFilterKernel(j, i);
+                let amount = 0;
+                for (const d of kernel) {
+                    if (d.x < 0 || d.y < 0 || d.x >= width || d.y >= len) {
+                        continue;
+                    }
+                    const v = list[d.y][d.x];
+                    amount += (v * d.e) / 9;
+                }
+                row[j] += amount * k;
+            }
+        }
+    }
+    getFilterKernel(x, y) {
+        return [
+            { x: x - 1, y: y - 1, e: -1 },
+            { x: x - 0, y: y - 1, e: -1 },
+            { x: x + 1, y: y - 1, e: -1 },
+            { x: x - 1, y: y - 0, e: -1 },
+            { x: x - 0, y: y - 0, e: 8 },
+            { x: x + 1, y: y - 0, e: -1 },
+            { x: x - 1, y: y + 1, e: -1 },
+            { x: x - 0, y: y + 1, e: -1 },
+            { x: x + 1, y: y + 1, e: -1 },
+        ];
+    }
+    buildPeakList(bufferedData, targetIndexCount, unsherpMaskGain) {
+        const peakList = [];
+        const maxes = new Uint8Array(targetIndexCount);
+        maxes.fill(0);
+        const mins = new Uint8Array(targetIndexCount);
+        mins.fill(255);
+        const dBuffers = new Array(targetIndexCount);
+        dBuffers.fill(0);
+        const lastBuffers = new Array(targetIndexCount);
+        lastBuffers.fill(0);
+        const lastDBuffers = new Array(targetIndexCount);
+        lastDBuffers.fill(0);
+        let lastState = 0;
+        const image = [];
+        // console.log('parseExec A');
+        for (const row of bufferedData) {
+            const map = row.pop();
+            const state = row.pop();
+            const time = row.pop();
+            image.push(map);
+            const calced = { state, time, data: null, lastState };
+            peakList.push(calced);
+            lastState = state;
+        }
+
+        this.unsharpFilter(image, targetIndexCount, unsherpMaskGain);
+        let rowIndex = 0;
+        for (const row of image) {
+            const data = [];
+            for (let i = 0; i < targetIndexCount; i++) {
+                const index = i; //Math.floor(i / 5);
+                const offseted = index * subCount + harf + 1;
+                const target = row[offseted];
+                const max = maxes[index];
+                const lastValue = lastBuffers[index];
+                const dValue = target - lastValue;
+                const lastDValue = lastDBuffers[index];
+                const pValue = dValue * (lastDValue === 0 ? 1 : lastDValue);
+                lastDBuffers[index] = dBuffers[index];
+                dBuffers[index] = dValue;
+                lastBuffers[index] = target;
+                maxes[index] = target > max ? target : max;
+                const min = mins[index];
+                mins[index] = min > target ? target : min;
+                data.push({ target, pValue, lastValue });
+            }
+            peakList[rowIndex].data = data;
+            // console.log('parseExec A data.length:' + data.length + '/indexCount:' + indexCount);
+            rowIndex++;
+        }
+        return { peakList, maxes };
+    }
+    parseExec(bufferedData, indexCount, targetIndexCount, unsherpMaskGain) {
+        console.log(
+            'parse bufferedData.length:' +
+                bufferedData.length +
+                '/indexCount:' +
+                indexCount +
+                '/targetIndexCount:' +
+                targetIndexCount
+        );
+        const { peakList, maxes } = this.buildPeakList(
+            bufferedData,
+            targetIndexCount,
+            unsherpMaskGain
+        );
+        if (bufferedData.length < 1 || peakList.length < 1) {
+            return false;
+        }
+        console.log('parseExec B');
+        const thresholds = [];
+        for (let i = 0; i < targetIndexCount; i++) {
+            const max = maxes[i];
+            const threshold = max * 0.9;
+            thresholds.push(threshold);
+        }
+        // console.log(maxes);
+        // console.log(thresholds);
+        // console.log('parseExec C');
+        const spanDuration = this.spanDuration * 1;
+        const offset = Math.ceil(spanDuration * 1.1);
+        const firstTime = peakList[0].time;
+        // console.log(
+        //     'offset:' + offset + '/spanDuration:' + spanDuration
+        //     //+ '/firstPeakTime:' + firstPeakTime
+        // );
+        const startTime = firstTime + offset;
+        const { endUnixTime, startUnixTime } = this.preDecode(
+            peakList,
+            thresholds,
+            targetIndexCount
+        );
         // console.log('parseExec E');
         const targetCharCount = Math.floor((endUnixTime - startUnixTime) / spanDuration);
         const isOdd = targetCharCount % 2;
-        // console.log(peakList);
+        console.log(peakList);
         const parsedCounts = {};
         const parsedMax = {};
-        const cache = {};
-        const cacheNulls = {};
         for (let k = 0; k < 5; k++) {
-            // console.log('k:' + k);
-            const parsed = [];
-            let parseCounter = 1;
-            let weight = '';
-            let lastChar = null;
-            let firstChangeChar = null;
-            let changeCount = 0;
-            let nullsCount = 0;
-            let samplingCount = 0;
-            const spanOffset = Math.ceil(spanDuration / 0.9) + 3 * k;
-            for (const calced of peakList) {
-                const state = calced.state;
-                const lastState = calced.lastState;
-                const time = calced.time;
-                const nextPeakTime = startTime + spanDuration * parseCounter + spanOffset;
-                const diff = nextPeakTime - time - spanOffset;
-                const hamingResult = calced.hamingResult;
-                const char = hamingResult.hex;
-                // console.log(
-                //     diff +
-                //         '/' +
-                //         time +
-                //         '/' +
-                //         Math.floor((time - startTime) / spanDuration) +
-                //         // '/offset:' +
-                //         // offset +
-                //         '/state:' +
-                //         state +
-                //         '/pc:' +
-                //         parseCounter +
-                //         // '/lastState:' +
-                //         // lastState +
-                //         '/ls:' +
-                //         lastState +
-                //         '/c:' +
-                //         char +
-                //         '/bit:' +
-                //         hamingResult.bit +
-                //         '/i:' +
-                //         hamingResult.i +
-                //         '/p:' +
-                //         hamingResult.p +
-                //         '/codn:' +
-                //         hamingResult.codn +
-                //         '/b:' +
-                //         calced.splicedcxbyte +
-                //         // '/isPeaked:' +
-                //         // isPeaked +
-                //         '/' +
-                //         hamingResult.isFailed
-                // );
-                const isReadable = state > 0 || lastState > 0;
-                if (isReadable) {
-                    weight = spanDuration + 20 - Math.abs(diff);
-                    firstChangeChar =
-                        firstChangeChar === null && char !== lastChar ? char : firstChangeChar;
-                    const currentWeight =
-                        char !== lastChar
-                            ? firstChangeChar === char
-                                ? weight * 2
-                                : weight * 1
-                            : weight;
-                    if (!hamingResult.isFailed) {
-                        cache[char] = cache[char] ? cache[char] + currentWeight : currentWeight;
-                    } else {
-                        cacheNulls[char] = cacheNulls[char]
-                            ? cacheNulls[char] + currentWeight
-                            : currentWeight;
-                    }
-                }
-                if (nextPeakTime <= time) {
-                    const targetChar = this.getMaxCountKey(cache);
-                    const targetCharNulls = this.getMaxCountKey(cacheNulls);
-                    console.log(
-                        nextPeakTime +
-                            '/' +
-                            time +
-                            '/' +
-                            targetChar +
-                            '/' +
-                            targetCharNulls +
-                            '/' +
-                            parseCounter +
-                            '/isReadable:' +
-                            isReadable +
-                            '/' +
-                            samplingCount
-                    );
-                    parseCounter++;
-                    if (targetChar !== null) {
-                        changeCount += lastChar !== targetChar ? 1 : 0;
-                        parsed.push(targetChar);
-                        lastChar = targetChar;
-                    } else if (targetCharNulls !== null) {
-                        console.log(cache);
-                        console.log(cacheNulls);
-                        nullsCount++;
-                        changeCount += lastChar !== targetCharNulls ? 1 : 0;
-                        parsed.push(targetCharNulls);
-                        lastChar = targetCharNulls;
-                    } else {
-                        console.log(cache);
-                        console.log(cacheNulls);
-                        nullsCount++;
-                    }
-                    weight = 1;
-                    firstChangeChar = null;
-                    this.clearMap(cache);
-                    this.clearMap(cacheNulls);
-                    samplingCount = 0;
-                }
-
-                samplingCount++;
-            }
-
-            console.log(
-                'targetCharCount:' +
-                    targetCharCount +
-                    '/parsed.length :' +
-                    parsed.length +
-                    '/startUnixTime:' +
-                    startUnixTime +
-                    '/endUnixTime:' +
-                    endUnixTime +
-                    '/parseCounter:' +
-                    parseCounter +
-                    '/nullsCount:' +
-                    nullsCount
+            const result = this.parseParUnitTime(
+                peakList,
+                k,
+                spanDuration,
+                targetCharCount,
+                startTime,
+                thresholds,
+                targetIndexCount
             );
-            if (
-                targetCharCount === parsed.length - nullsCount + 1 + isOdd ||
-                targetCharCount === parsed.length - nullsCount + 2 + isOdd ||
-                targetCharCount === parsed.length - nullsCount + 3 + isOdd
-            ) {
-                parsedCounts[k + '_'] = changeCount - (nullsCount * targetCharCount) / 20;
-                parsedMax[k + '_'] = parsed;
+            if (result) {
+                parsedCounts[k + '_'] = result.parsedCounts;
+                parsedMax[k + '_'] = result.parsed;
             }
         }
         // console.log('parseExec F');
         const maxK = this.getMaxCountKey(parsedCounts);
         console.log(parsedCounts);
         const parsed = parsedMax[maxK];
-        console.log(parsed);
+        console.log(parsed ? parsed.join('') : null);
         try {
             this.output(parsed);
         } catch (e) {
@@ -611,15 +750,21 @@ export class Reciver {
         const indexCount = targetIndexes.length * 5;
         const targetIndexCount = this.frequencies.length;
         const bufferedData = [];
-        const binVlueThreshold = this.binVlueThreshold;
         console.log('decode');
         while (true) {
+            const binVlueThreshold = this.binVlueThreshold;
+            const unsherpMaskGain = this.unsherpMaskGain;
             const start = Date.now();
             this.analyser.getByteFrequencyData(buffer);
             const selected = [];
+            const selectedMap = [];
             let max = 0;
             let min = 255;
             for (const index of targetIndexes) {
+                for (let i = 0; i < subCount; i++) {
+                    const offset = i - harf;
+                    selectedMap.push(buffer[index + offset]);
+                }
                 const target = buffer[index];
                 max = target > max ? target : max;
                 min = target > min ? min : target;
@@ -633,24 +778,34 @@ export class Reciver {
                     ? 0
                     : 128;
             selected.push(selectedSate);
+            selected.push(selectedMap);
             // console.log(buffer);
             // console.log('state.isRecording:' + state.isRecording);
             // console.log('state.isRecording:' + state.isRecording + '/selectedSate:' + selectedSate);
             if (state.isRecording) {
                 state.lastEnd = selectedSate ? start : state.lastEnd;
                 if (start - state.lastEnd > thesholdMsEnd) {
-                    state.isRecording = false;
                     this.onStateChange(Reciver.state.PARSING);
-                    const result = await this.parse(bufferedData, indexCount, targetIndexCount);
+                    const result = await this.parse(
+                        bufferedData,
+                        indexCount,
+                        targetIndexCount,
+                        unsherpMaskGain
+                    );
+                    // console.log('result:' + result);
                     if (result) {
+                        state.isRecording = false;
                         this.onStateChange(Reciver.state.WAITING);
                     } else {
                         this.onStateChange(Reciver.state.FAIL);
                         setTimeout(() => {
+                            state.isRecording = false;
                             this.onStateChange(Reciver.state.WAITING);
                         }, 3000);
                     }
                     bufferedData.splice(0, bufferedData.length);
+                    // console.log(bufferedData);
+                    await ProcessUtil.sleep(100);
                 } else {
                     bufferedData.push(selected);
                 }
@@ -669,6 +824,7 @@ export class Reciver {
             }
             await ProcessUtil.sleep(0);
             if (this.isStop) {
+                console.log('stop decoder');
                 break;
             }
         }

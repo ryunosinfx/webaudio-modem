@@ -30,7 +30,7 @@
 
                 <h2>config</h2>
                 <label for="active-duration">Bit high duration: <span data-val></span> ms</label>
-                <input id="active-duration" type="range" value="40" min="10" , max="1000" , step="10">
+                <input id="active-duration" type="range" value="40" min="5" , max="100" , step="5">
 
                 <label for="pause-duration">Pause between bytes: <span data-val></span> ms</label>
                 <input id="pause-duration" type="range" value="0" min="0" , max="500" , step="10">
@@ -50,7 +50,9 @@
                 <label for="bin-value-threshold">Significant bin byte value threshold: <span data-val></span></label>
                 <input id="bin-value-threshold" type="range" value="200" min="1" , max="255" , step="1">
                 <label for="span-duration">Bit high span duration: <span data-val></span> ms</label>
-                <input id="span-duration" type="range" value="40" min="10" , max="1000" , step="10">
+                <input id="span-duration" type="range" value="40" min="5" , max="100" , step="5">
+                <label for="unsherp-mask-gain">Unsherp mask gain: x<span data-val></span> </label>
+                <input id="unsherp-mask-gain" type="range" value="1" min="0" , max="3" , step="0.1">
             </div>
         </div>
     </div>

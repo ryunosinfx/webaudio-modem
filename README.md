@@ -93,6 +93,12 @@ reciver.setBinVlueThreshold(200);
 reciver.setSpanDulation(40);
 
 /**
+ * Unsharp mask to the Wave shape for bit change timing clarification.
+ * @param {number} unsherpMaskGain 0:no effect. 2:Recommendation
+ */
+reciver.setUnsherpMaskGain(1);
+
+/**
  * The output data type. Default output type is string.
  * @param {string} outputType text or Uint8Array.
  */
