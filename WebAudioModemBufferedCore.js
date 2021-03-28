@@ -316,6 +316,67 @@ export class Reciver {
     parsecharContinuous(part, thresholds, targetIndexCount) {
         const charContinuous = [];
         let lastChar = null;
+        const bytes = [];
+        for (const calced of part) {
+            const data = calced.data;
+            // const time = calced.time;
+            // const byte = this.readByte(data, thresholds, targetIndexCount);
+
+            bytes.push(data);
+        }
+        const byte = new Array(targetIndexCount);
+        byte.fill(0);
+        const len = bytes.length;
+        let count = 0;
+        const lenHalf = len / 2;
+        for (const data of bytes) {
+            for (let i = 0; i < targetIndexCount; i++) {
+                const threshold = thresholds[i];
+                const bitData = data[i].lastValue;
+                if (threshold < bitData) {
+                    byte[i] += lenHalf - Math.abs(lenHalf - count) + len;
+                }
+            }
+            count++;
+        }
+        let uint8 = 0;
+        for (let i = 0; i < targetIndexCount; i++) {
+            const avg = byte[i] / (len * (len + lenHalf));
+            if (avg > 0.4) {
+                uint8 += (1 << i) * 1;
+            }
+        }
+        const hamingResult = this.valitadeHaming(uint8);
+        const char = hamingResult.hex;
+        console.log('char:' + char);
+        for (const calced of part) {
+            calced.hamingResult = hamingResult;
+            calced.byte = uint8;
+            const state = calced.state;
+            const lastState = calced.lastState;
+            const isReadable = state > 0 || lastState > 0;
+            if (!isReadable) {
+                continue;
+            }
+            if (char === lastChar) {
+                charContinuous.push(hamingResult);
+            } else {
+                for (const hamingResult of charContinuous) {
+                    if (!hamingResult.isFailed) {
+                        for (const hamingResult of charContinuous) {
+                            hamingResult.isFailed = 0;
+                        }
+                        break;
+                    }
+                }
+                charContinuous.splice(0, charContinuous.length);
+            }
+            lastChar = char;
+        }
+    }
+    parsecharContinuous1(part, thresholds, targetIndexCount) {
+        const charContinuous = [];
+        let lastChar = null;
         let startUnixTime = Date.now();
         let endUnixTime = 0;
         for (const calced of part) {
@@ -402,13 +463,13 @@ export class Reciver {
         if (targetChar !== null) {
             // changeCount += lastChar !== targetChar ? 1 : 0;
             // const startTime = firstTime + offset;
-            this.parsecharContinuous(part, thresholds, targetIndexCount);
+            this.parsecharContinuous1(part, thresholds, targetIndexCount);
             parsed.push(targetChar);
             lastChar = targetChar;
         } else if (targetCharNulls !== null) {
             // console.log(cache);
             // console.log(cacheNulls);
-            nullsCount++;
+            // nullsCount++;
             // changeCount += lastChar !== targetCharNulls ? 1 : 0;
             parsed.push(targetCharNulls);
             lastChar = targetCharNulls;
@@ -436,7 +497,8 @@ export class Reciver {
         let parseCounter = 1;
         let changeCount = 0;
         let nullsCount = 0;
-        const spanOffset = Math.ceil(spanDuration / 2) + Math.floor((spanDuration * k) / 10);
+        const k2 = k + 2;
+        const spanOffset = Math.ceil(spanDuration / 2) + Math.floor((spanDuration * k2) / 10);
         const startTime = startTimeInput - Math.ceil(spanDuration / 2);
         console.log(
             'parseParUnitTime k:' +
@@ -486,18 +548,21 @@ export class Reciver {
                 '/parsed.length:' +
                 parsed.length
         );
-        if (
-            targetCharCount === parsed.length - nullsCount - 1 + isOdd ||
-            targetCharCount === parsed.length - nullsCount + 0 + isOdd ||
-            targetCharCount === parsed.length - nullsCount + 1 + isOdd
-        ) {
-            console.log(parsed?.join(''));
-            return {
-                parsedCounts: changeCount - (nullsCount * targetCharCount) / 20,
-                parsed: parsed.slice(0, targetCharCount),
-            };
-        }
-        return null;
+        // if (
+        //     targetCharCount === parsed.length - nullsCount - 4 + isOdd ||
+        //     targetCharCount === parsed.length - nullsCount - 3 + isOdd ||
+        //     targetCharCount === parsed.length - nullsCount - 2 + isOdd ||
+        //     targetCharCount === parsed.length - nullsCount - 1 + isOdd ||
+        //     targetCharCount === parsed.length - nullsCount + 0 + isOdd ||
+        //     targetCharCount === parsed.length - nullsCount + 1 + isOdd
+        // ) {
+        console.log(parsed?.join(''));
+        return {
+            parsedCounts: changeCount - (nullsCount * targetCharCount) / 20,
+            parsed: parsed.slice(0, targetCharCount),
+        };
+        // }
+        // return null;
     }
     preDecode(peakList, thresholds, targetIndexCount) {
         const charContinuous = [];
