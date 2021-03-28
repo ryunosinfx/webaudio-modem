@@ -1,6 +1,6 @@
 {
   "name": "webaudio-modem",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "webaudio-modem",
   "main": "WebAudioModemBufferedCore.js",
   "scripts": {
