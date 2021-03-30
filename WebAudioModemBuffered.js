@@ -56,7 +56,7 @@ class Encoder {
 class Decoder {
     constructor(
         binVlueThresholdId = 'bin-value-threshold',
-        spanDulationId = 'span-dulation',
+        spanDurationId = 'span-duration',
         outputId = 'output',
         clearId = 'clearBtn',
         codeId = 'code',
@@ -65,7 +65,7 @@ class Decoder {
     ) {
         this.reciver = new Reciver();
         this.binVlueThresholdElm = V.gid(binVlueThresholdId);
-        this.spanDulationElm = V.gid(spanDulationId);
+        this.spanDurationElm = V.gid(spanDurationId);
         this.outputElm = V.gid(outputId);
         this.clearbtnElm = V.gid(clearId);
         this.codeElm = V.gid(codeId);
@@ -80,10 +80,10 @@ class Decoder {
             this.reciver.setBinVlueThreshold(e.target.value);
         });
         this.reciver.binVlueThreshold = this.binVlueThresholdElm.value * 1;
-        V.ael(this.spanDulationElm, 'change', (e) => {
-            this.reciver.setSpanDulation(e.target.value);
+        V.ael(this.spanDurationElm, 'change', (e) => {
+            this.reciver.setSpanDuration(e.target.value);
         });
-        this.reciver.spanDuration = this.spanDulationElm.value * 1;
+        this.reciver.spanDuration = this.spanDurationElm.value * 1;
         V.ael(this.unsherpMaskGainElm, 'change', (e) => {
             this.reciver.setUnsherpMaskGain(e.target.value);
         });

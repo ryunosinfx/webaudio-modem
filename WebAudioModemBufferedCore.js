@@ -204,7 +204,7 @@ export class Reciver {
     setBinVlueThreshold(threshold) {
         this.binVlueThreshold = threshold * 1;
     }
-    setSpanDulation(spanDuration) {
+    setSpanDuration(spanDuration) {
         this.spanDuration = spanDuration * 1;
     }
     setUnsherpMaskGain(unsherpMaskGain) {
@@ -340,15 +340,22 @@ export class Reciver {
             count++;
         }
         let uint8 = 0;
+        const base = len * (len + lenHalf);
+        const p = [];
+        const q = [];
         for (let i = 0; i < targetIndexCount; i++) {
-            const avg = byte[i] / (len * (len + lenHalf));
+            const avg = byte[i] / base;
+            p.push(Math.floor(avg * 100) / 100);
             if (avg > 0.4) {
                 uint8 += (1 << i) * 1;
+                q.push(1);
+            } else {
+                q.push(0);
             }
         }
         const hamingResult = this.valitadeHaming(uint8);
         const char = hamingResult.hex;
-        console.log('char:' + char);
+        console.log('char:' + char + '/' + uint8 + '/' + base + '/byte:' + q + '/' + p);
         for (const calced of part) {
             calced.hamingResult = hamingResult;
             calced.byte = uint8;
@@ -419,6 +426,7 @@ export class Reciver {
         const cacheNulls = {};
         let nullsCount = 0;
         const nextPeakTime = part.nextPeakTime;
+        this.parsecharContinuous(part, thresholds, targetIndexCount);
         for (const calced of part) {
             const state = calced.state;
             const lastState = calced.lastState;
@@ -463,7 +471,7 @@ export class Reciver {
         if (targetChar !== null) {
             // changeCount += lastChar !== targetChar ? 1 : 0;
             // const startTime = firstTime + offset;
-            this.parsecharContinuous1(part, thresholds, targetIndexCount);
+            // this.parsecharContinuous1(part, thresholds, targetIndexCount);
             parsed.push(targetChar);
             lastChar = targetChar;
         } else if (targetCharNulls !== null) {
@@ -497,7 +505,7 @@ export class Reciver {
         let parseCounter = 1;
         let changeCount = 0;
         let nullsCount = 0;
-        const k2 = k + 2;
+        const k2 = k + 1;
         const spanOffset = Math.ceil(spanDuration / 2) + Math.floor((spanDuration * k2) / 10);
         const startTime = startTimeInput - Math.ceil(spanDuration / 2);
         console.log(

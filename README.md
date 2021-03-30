@@ -90,7 +90,7 @@ reciver.setBinVlueThreshold(200);
  * The oscillator active duration time ms par a code. if you set pauseDuration>0, then contain with the duration.
  * @param {number} spanDuration duration time ms par a code.
  */
-reciver.setSpanDulation(40);
+reciver.setSpanDuration(40);
 
 /**
  * Unsharp mask to the Wave shape for bit change timing clarification.
